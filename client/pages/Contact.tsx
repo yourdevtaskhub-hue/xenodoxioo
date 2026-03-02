@@ -1,272 +1,209 @@
 import { motion } from "framer-motion";
-import { MapPin, Phone, Mail, Clock, Send } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, Send, MessageCircle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useState } from "react";
 import Layout from "@/components/Layout";
 
 export default function Contact() {
   const { language, t } = useLanguage();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    message: ""
-  });
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "", message: "" });
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log("Contact form submitted:", formData);
+    setSubmitted(true);
   };
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Hero Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-      >
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-black opacity-20"></div>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="relative z-10 py-24 lg:py-32">
-              <div className="text-center">
-                <motion.h1
-                  initial={{ opacity: 0, y: 30 }}
+      <div className="min-h-screen bg-[#fafaf9]">
+        {/* Hero — understated, concierge tone */}
+        <section className="relative py-20 md:py-28 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-transparent" />
+          <div className="container-max relative">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="max-w-2xl"
+            >
+              <h1 className="luxury-heading text-4xl md:text-5xl lg:text-6xl text-foreground tracking-tight">
+                {language === "el" ? "Επικοινωνία" : "Contact"}
+              </h1>
+              <p className="mt-4 text-lg md:text-xl text-muted-foreground leading-relaxed">
+                {t("contact.hero.subtitle")}
+              </p>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Main content — form + info */}
+        <section className="pb-20 md:pb-32">
+          <div className="container-max">
+            <div className="grid lg:grid-cols-5 gap-12 lg:gap-16">
+              {/* Form */}
+              <div className="lg:col-span-3">
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.2 }}
-                  className="text-4xl md:text-6xl font-bold tracking-tight"
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="bg-white rounded-xl border border-border/60 shadow-luxury p-8 md:p-10"
                 >
-                  {language === "el" ? "Επικοινωνήστε" : "Contact Us"}
-                </motion.h1>
-                <motion.p
-                  initial={{ opacity: 0, y: 30 }}
+                  {submitted ? (
+                    <div className="py-12 text-center">
+                      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                        <Send className="w-7 h-7 text-primary" />
+                      </div>
+                      <h3 className="luxury-heading text-2xl text-foreground">{t("contact.success.title")}</h3>
+                      <p className="mt-2 text-muted-foreground">{t("contact.success.desc")}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="luxury-heading text-2xl md:text-3xl text-foreground">
+                        {t("contact.form.title")}
+                      </h2>
+                      <p className="mt-2 text-muted-foreground text-sm">
+                        {t("contact.form.subtitle")}
+                      </p>
+                      <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1.5">
+                            {t("contact.form.name")} <span className="text-muted-foreground">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            className="luxury-input"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1.5">
+                            {t("contact.form.email")} <span className="text-muted-foreground">*</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            className="luxury-input"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1.5">
+                            {t("contact.form.phone")}
+                          </label>
+                          <input
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            placeholder={t("contact.form.phonePlaceholder")}
+                            className="luxury-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground mb-1.5">
+                            {t("contact.form.message")} <span className="text-muted-foreground">*</span>
+                          </label>
+                          <textarea
+                            value={formData.message}
+                            onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                            rows={4}
+                            placeholder={t("contact.form.messagePlaceholder")}
+                            className="luxury-input resize-none"
+                            required
+                          />
+                        </div>
+                        <button type="submit" className="luxury-btn-primary w-full">
+                          {t("contact.form.submit")}
+                        </button>
+                        <p className="text-xs text-muted-foreground text-center">
+                          {t("contact.form.privacy")}
+                        </p>
+                      </form>
+                    </>
+                  )}
+                </motion.div>
+              </div>
+
+              {/* Contact info + map */}
+              <div className="lg:col-span-2 space-y-8">
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.4 }}
-                  className="mt-6 max-w-3xl mx-auto text-xl md:text-2xl text-blue-100"
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="space-y-6"
                 >
-                  {language === "el"
-                    ? "Είμαστε εδώ για να σας βοηθήσουμε και να απαντήσουμε σε οποιαδήποτε ερώτηση."
-                    : "We're here to help you and answer any questions you may have."}
-                </motion.p>
+                  <h3 className="luxury-heading text-xl text-foreground">{t("contact.info.title")}</h3>
+                  <div className="space-y-4">
+                    <div className="flex gap-4">
+                      <MapPin className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
+                      <div>
+                        <p className="text-sm text-muted-foreground">{t("contact.info.address")}</p>
+                      </div>
+                    </div>
+                    <a href="tel:+302754051234" className="flex gap-4 group">
+                      <Phone className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
+                      <span className="text-foreground group-hover:text-primary transition-colors">
+                        {t("contact.info.phone")}
+                      </span>
+                    </a>
+                    <a href="mailto:info@leonidionhouses.com" className="flex gap-4 group">
+                      <Mail className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
+                      <span className="text-foreground group-hover:text-primary transition-colors">
+                        {t("contact.info.email")}
+                      </span>
+                    </a>
+                    <div className="flex gap-4">
+                      <Clock className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{t("contact.info.hours")}</p>
+                        <p className="text-sm text-muted-foreground">{t("contact.info.hoursVal")}</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Response reassurance */}
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                  className="p-6 rounded-lg bg-primary/5 border border-primary/10"
+                >
+                  <div className="flex gap-4">
+                    <MessageCircle className="w-6 h-6 text-primary shrink-0" strokeWidth={1.25} />
+                    <div>
+                      <h4 className="font-medium text-foreground">{t("contact.response.title")}</h4>
+                      <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                        {t("contact.response.desc")}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Map */}
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
+                  className="aspect-[4/3] rounded-lg overflow-hidden border border-border/60"
+                >
+                  <iframe
+                    title="Leonidion location"
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=22.8482%2C37.1557%2C22.8982%2C37.1857&layer=mapnik&marker=37.17%2C22.87"
+                    className="w-full h-full"
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </motion.div>
               </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-start">
-          {/* Left Column - Contact Form */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
-            className="space-y-8"
-          >
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">
-                {language === "el" ? "Στείλτε Επικοινωνία" : "Get in Touch"}
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {language === "el" ? "Ονομα" : "Name"}
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {language === "el" ? "Email" : "Email"}
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {language === "el" ? "Τηλέφωνο" : "Phone"}
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={language === "el" ? "+30 27540 51234" : "+30 27540 51234"}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {language === "el" ? "Μήνυμα" : "Message"}
-                  </label>
-                  <textarea
-                    value={formData.message}
-                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                    rows={4}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={language === "el" ? "Περιγράψτε το μήνυμά σας εδώ..." : "Write your message here..."}
-                    required
-                  />
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold py-4 px-6 rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-                >
-                  {language === "el" ? "Αποστολή Μηνύματος" : "Send Message"}
-                </motion.button>
-              </form>
-            </div>
-
-            {/* Contact Information */}
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100"
-            >
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                {language === "el" ? "Στοιχεία Επικοινωνίας" : "Contact Information"}
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <MapPin className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900">
-                      {language === "el" ? "Διεύθυνση" : "Address"}
-                    </h4>
-                    <p className="text-gray-600">
-                      {language === "el"
-                        ? "Λεωνίδιο, Ελλάδα"
-                        : "Leonidion, Greece"
-                      }
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900">
-                      {language === "el" ? "Τηλέφωνο" : "Phone"}
-                    </h4>
-                    <p className="text-gray-600">
-                      +30 27540 51234
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900">
-                      {language === "el" ? "Email" : "Email"}
-                    </h4>
-                    <p className="text-gray-600">
-                      info@leonidionhouses.com
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Clock className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900">
-                      {language === "el" ? "Ώρες Λειτουργίας" : "Business Hours"}
-                    </h4>
-                    <p className="text-gray-600">
-                      {language === "el"
-                        ? "Δευτέρα - Παρασκευή: 9:00 - 17:00"
-                        : "Monday - Friday: 9:00 AM - 5:00 PM"
-                    }
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          {/* Right Column - Visual Content */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
-            className="space-y-8"
-          >
-            {/* Map/Image */}
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <motion.img
-                initial={{ scale: 1.1, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 1.2, delay: 0.8 }}
-                src="https://images.unsplash.com/photo-1571019637454-2c2c0e0a9c3d5a5a6?ixlib=rb-4.0.3&ixid=MnwxhbT2Zj6q7"
-                alt="Beautiful coastal view of Leonidion"
-                className="w-full h-64 object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-            </div>
-
-            {/* Quick Contact Cards */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 1 }}
-              className="grid grid-cols-1 gap-6 mt-8"
-            >
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="p-3 bg-blue-100 rounded-lg text-blue-600">
-                    <Send className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {language === "el" ? "Γρήγορη Επικοινωνία" : "Quick Response"}
-                  </h3>
-                </div>
-                <p className="text-gray-600">
-                  {language === "el"
-                    ? "Συνήθως απαντάμε εντός 24 ωρών."
-                    : "We typically respond within 24 hours."}
-                </p>
-              </motion.div>
-
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="p-3 bg-green-100 rounded-lg text-green-600">
-                    <Phone className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {language === "el" ? "Τηλέφωνο Εξυπηρέτησης" : "Support Hotline"}
-                  </h3>
-                </div>
-                <p className="text-gray-600">
-                  {language === "el"
-                    ? "+30 27540 51234"
-                    : "+30 27540 51234"}
-                </p>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        </div>
+        </section>
       </div>
-    </div>
     </Layout>
   );
 }

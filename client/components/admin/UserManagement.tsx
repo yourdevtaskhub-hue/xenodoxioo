@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 import { Search, Filter, Eye, Edit, Mail, Calendar, BookOpen } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -39,7 +40,7 @@ export default function UserManagement() {
         ...(searchTerm && { search: searchTerm })
       });
 
-      const response = await fetch(`/api/admin/users?${params}`);
+      const response = await fetch(apiUrl(`/api/admin/users?${params}`));
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users || []);
@@ -63,7 +64,7 @@ export default function UserManagement() {
 
   const handleStatusUpdate = async (userId: string, newStatus: string) => {
     try {
-      const response = await fetch(`/api/admin/users/${userId}/status`, {
+      const response = await fetch(apiUrl(`/api/admin/users/${userId}/status`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })

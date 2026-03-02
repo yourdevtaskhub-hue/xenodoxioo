@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -69,7 +70,7 @@ export default function BookingDetail() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/bookings/${id}`, {
+        const response = await fetch(apiUrl(`/api/bookings/${id}`), {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         const json = await response.json().catch(() => ({}));

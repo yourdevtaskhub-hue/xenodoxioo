@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl, imageUrl } from "@/lib/api";
 import { Plus, Edit, Trash2, BedDouble, Image as ImageIcon } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -56,8 +57,8 @@ export default function PropertyManagement() {
   const fetchData = async () => {
     try {
       const [propertiesRes, unitsRes] = await Promise.all([
-        fetch("/api/admin/properties"),
-        fetch("/api/admin/units")
+        fetch(apiUrl("/api/admin/properties")),
+        fetch(apiUrl("/api/admin/units"))
       ]);
 
       if (propertiesRes.ok && unitsRes.ok) {
@@ -85,7 +86,7 @@ export default function PropertyManagement() {
         submitData.append("mainImage", formData.mainImage);
       }
 
-      const response = await fetch("/api/admin/properties", {
+      const response = await fetch(apiUrl("/api/admin/properties"), {
         method: "POST",
         body: submitData,
       });
@@ -116,7 +117,7 @@ export default function PropertyManagement() {
       fd.append("minStayDays", String(formData.minStayDays));
       (formData.imageFiles || []).forEach((f: File) => fd.append("images", f));
 
-      const response = await fetch("/api/admin/units", {
+      const response = await fetch(apiUrl("/api/admin/units"), {
         method: "POST",
         body: fd,
       });
@@ -154,7 +155,7 @@ export default function PropertyManagement() {
       fd.append("country", formData.country);
       if (formData.mainImage instanceof File) fd.append("mainImage", formData.mainImage);
 
-      const response = await fetch(`/api/admin/properties/${editingProperty.id}`, {
+      const response = await fetch(apiUrl(`/api/admin/properties/${editingProperty.id}`), {
         method: "PUT",
         body: fd,
       });
@@ -185,7 +186,7 @@ export default function PropertyManagement() {
       fd.append("existingImages", JSON.stringify(existing));
       (formData.imageFiles || []).forEach((f: File) => fd.append("images", f));
 
-      const response = await fetch(`/api/admin/units/${editingUnit.id}`, {
+      const response = await fetch(apiUrl(`/api/admin/units/${editingUnit.id}`), {
         method: "PUT",
         body: fd,
       });
@@ -202,7 +203,7 @@ export default function PropertyManagement() {
   const handleDeleteProperty = async (id: string) => {
     if (!confirm("Delete this property and all its units?")) return;
     try {
-      const response = await fetch(`/api/admin/properties/${id}`, { method: "DELETE" });
+      const response = await fetch(apiUrl(`/api/admin/properties/${id}`), { method: "DELETE" });
       if (response.ok) fetchData();
     } catch (error) {
       console.error("Failed to delete property:", error);
@@ -212,7 +213,7 @@ export default function PropertyManagement() {
   const handleDeleteUnit = async (id: string) => {
     if (!confirm("Delete this unit?")) return;
     try {
-      const response = await fetch(`/api/admin/units/${id}`, { method: "DELETE" });
+      const response = await fetch(apiUrl(`/api/admin/units/${id}`), { method: "DELETE" });
       if (response.ok) fetchData();
     } catch (error) {
       console.error("Failed to delete unit:", error);
@@ -263,7 +264,7 @@ export default function PropertyManagement() {
             <div className="flex justify-between items-start mb-4">
               <div className="flex gap-4">
                 <img
-                  src={property.mainImage}
+                  src={imageUrl(property.mainImage)}
                   alt={property.name}
                   className="w-24 h-24 object-cover rounded-lg"
                 />
@@ -451,7 +452,7 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
             {(formData.mainImage || property?.mainImage) && (
               <div className="mt-2">
                 <img 
-                  src={formData.mainImage ? URL.createObjectURL(formData.mainImage) : property?.mainImage} 
+                  src={formData.mainImage ? URL.createObjectURL(formData.mainImage) : imageUrl(property?.mainImage)} 
                   alt="Preview" 
                   className="w-32 h-32 object-cover rounded-lg border border-border"
                 />

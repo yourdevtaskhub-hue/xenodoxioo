@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -24,7 +25,7 @@ export default function AvailabilityCalendar({
     }
     const fetchOccupied = async () => {
       try {
-        const res = await fetch(`/api/bookings/occupied-dates?unitId=${encodeURIComponent(unitId)}`);
+        const res = await fetch(apiUrl(`/api/bookings/occupied-dates?unitId=${encodeURIComponent(unitId)}`));
         if (res.ok) {
           const json = await res.json();
           setOccupiedRanges(json.data || []);

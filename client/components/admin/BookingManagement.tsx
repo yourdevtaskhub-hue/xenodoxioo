@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 import { Search, Filter, Eye, Edit, Trash2, Calendar, Users, DollarSign } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -54,7 +55,7 @@ export default function BookingManagement() {
         ...(searchTerm && { search: searchTerm })
       });
 
-      const response = await fetch(`/api/admin/bookings?${params}`);
+      const response = await fetch(apiUrl(`/api/admin/bookings?${params}`));
       if (response.ok) {
         const data = await response.json();
         setBookings(data.bookings || []);
@@ -69,7 +70,7 @@ export default function BookingManagement() {
 
   const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
     try {
-      const response = await fetch(`/api/admin/bookings/${bookingId}/status`, {
+      const response = await fetch(apiUrl(`/api/admin/bookings/${bookingId}/status`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })

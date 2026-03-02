@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, User } from "lucide-react";
 import { useState } from "react";
@@ -36,7 +37,7 @@ export default function Register() {
     setIsLoading(true);
     try {
       console.log("🔍 [AUTH] Registering user...", { email: formData.email });
-      const response = await fetch("/api/auth/register", {
+      const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

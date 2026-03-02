@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -118,7 +119,7 @@ export default function Checkout() {
         guests,
       });
 
-      const response = await fetch("/api/bookings", {
+      const response = await fetch(apiUrl("/api/bookings"), {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -174,7 +175,7 @@ export default function Checkout() {
     setCouponError(null);
 
     try {
-      const response = await fetch("/api/admin/coupons/validate", {
+      const response = await fetch(apiUrl("/api/admin/coupons/validate"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -195,7 +196,7 @@ export default function Checkout() {
         
         // Fetch new quote with coupon applied
         try {
-          const quoteResponse = await fetch("/api/bookings/quote", {
+          const quoteResponse = await fetch(apiUrl("/api/bookings/quote"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -240,7 +241,7 @@ export default function Checkout() {
     
     // Fetch original quote without coupon
     try {
-      const response = await fetch("/api/bookings/quote", {
+      const response = await fetch(apiUrl("/api/bookings/quote"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -267,7 +268,7 @@ export default function Checkout() {
 
   const fetchTaxSettings = async () => {
     try {
-      const response = await fetch("/api/admin/settings/tax");
+      const response = await fetch(apiUrl("/api/admin/settings/tax"));
       if (response.ok) {
         const settings = await response.json();
         setTaxSettings(settings);
@@ -275,7 +276,7 @@ export default function Checkout() {
         // Refresh quote with new tax settings
         if (unitId && checkIn && checkOut) {
           try {
-            const quoteResponse = await fetch("/api/bookings/quote", {
+            const quoteResponse = await fetch(apiUrl("/api/bookings/quote"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -328,7 +329,7 @@ export default function Checkout() {
           checkOut,
           guests,
         });
-        const response = await fetch("/api/bookings/quote", {
+        const response = await fetch(apiUrl("/api/bookings/quote"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

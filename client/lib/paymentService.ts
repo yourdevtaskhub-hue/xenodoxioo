@@ -1,3 +1,4 @@
+import { apiUrl } from "./api";
 import {
   PaymentIntentData,
   STRIPE_ENDPOINTS,
@@ -38,7 +39,7 @@ export async function createPaymentIntent(
   request: CreatePaymentIntentRequest,
 ): Promise<PaymentResponse> {
   try {
-    const response = await fetch(STRIPE_ENDPOINTS.createPaymentIntent, {
+    const response = await fetch(apiUrl(STRIPE_ENDPOINTS.createPaymentIntent), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -70,7 +71,7 @@ export async function confirmPayment(
   paymentIntentId: string,
 ): Promise<PaymentResponse> {
   try {
-    const response = await fetch(STRIPE_ENDPOINTS.confirmPayment, {
+    const response = await fetch(apiUrl(STRIPE_ENDPOINTS.confirmPayment), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -106,7 +107,7 @@ export async function refundPayment(
   amount?: number,
 ): Promise<PaymentResponse> {
   try {
-    const response = await fetch(STRIPE_ENDPOINTS.refundPayment, {
+    const response = await fetch(apiUrl(STRIPE_ENDPOINTS.refundPayment), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -141,7 +142,7 @@ export async function scheduleRemainingPayment(
   checkInDate: Date,
 ): Promise<PaymentResponse> {
   try {
-    const response = await fetch("/api/schedule-payment", {
+    const response = await fetch(apiUrl("/api/schedule-payment"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -173,7 +174,7 @@ export async function scheduleRemainingPayment(
  */
 export async function getPaymentHistory(bookingId: string) {
   try {
-    const response = await fetch(`/api/payments/${bookingId}`);
+    const response = await fetch(apiUrl(`/api/payments/${bookingId}`));
 
     if (!response.ok) {
       throw new Error("Failed to fetch payment history");

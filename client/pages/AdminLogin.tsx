@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("admin@booking.com");
@@ -20,7 +21,7 @@ export default function AdminLogin() {
     setError("");
 
     try {
-      const response = await fetch("/api/admin/login", {
+      const response = await fetch(apiUrl("/api/admin/login"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

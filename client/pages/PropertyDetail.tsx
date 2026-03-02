@@ -27,6 +27,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useLanguage } from "@/hooks/useLanguage";
+import { apiUrl, imageUrl } from "@/lib/api";
 import formatCurrency from "@/lib/currency";
 
 type ApiUnit = {
@@ -115,7 +116,7 @@ export default function PropertyDetail() {
       if (!id) return;
       try {
         console.log("🔍 [CLIENT] Fetching property detail...", id);
-        const response = await fetch(`/api/properties/${id}`);
+        const response = await fetch(apiUrl(`/api/properties/${id}`));
         if (!response.ok) {
           throw new Error(`Failed to load property: ${response.status}`);
         }
@@ -211,7 +212,7 @@ export default function PropertyDetail() {
               <div className="md:col-span-2 relative rounded-lg overflow-hidden h-96 md:h-[500px]">
                 {images.length > 0 && (
                   <img
-                    src={images[selectedImage]}
+                    src={imageUrl(images[selectedImage])}
                     alt={currentUnit?.name ?? data.property.name}
                     loading="eager"
                     decoding="async"
@@ -315,9 +316,9 @@ export default function PropertyDetail() {
                               : ""
                           }`}
                         >
-                          <img
-                            src={image}
-                            alt={`View ${idx + 1}`}
+                      <img
+                        src={imageUrl(image)}
+                        alt={`View ${idx + 1}`}
                             loading="lazy"
                             decoding="async"
                             className="w-full h-full object-cover hover:scale-105 transition-transform"
@@ -436,7 +437,7 @@ export default function PropertyDetail() {
                           >
                             <video
                               ref={videoRef}
-                              src={getViewVideoPath(data.property.name, currentUnit.name)!}
+                              src={apiUrl(getViewVideoPath(data.property.name, currentUnit.name) || "")}
                               controls
                               playsInline
                               preload="auto"

@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 import {
   BarChart3,
   Calendar,
@@ -46,7 +47,7 @@ function PricingAndDiscounts() {
 
   const fetchPricing = async () => {
     try {
-      const res = await fetch("/api/admin/pricing");
+      const res = await fetch(apiUrl("/api/admin/pricing"));
       if (res.ok) {
         const data = await res.json();
         setSeasonalPricing(data.seasonalPricing || []);
@@ -116,7 +117,7 @@ function PricingAndDiscounts() {
     };
     try {
       if (editingCoupon) {
-        const res = await fetch(`/api/admin/coupons/${editingCoupon.id}`, {
+        const res = await fetch(apiUrl(`/api/admin/coupons/${editingCoupon.id}`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -130,7 +131,7 @@ function PricingAndDiscounts() {
         await fetchPricing();
         alert(t("admin.couponUpdated"));
       } else {
-        const res = await fetch("/api/admin/coupons", {
+        const res = await fetch(apiUrl("/api/admin/coupons"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -153,7 +154,7 @@ function PricingAndDiscounts() {
     if (!confirm(t("admin.deleteCouponConfirm"))) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/admin/coupons/${id}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/admin/coupons/${id}`), { method: "DELETE" });
       if (res.ok) {
         await fetchPricing();
         alert(t("admin.couponDeleted"));
@@ -462,7 +463,7 @@ export default function Admin() {
   const fetchStats = async () => {
     try {
       console.log("🔍 [ADMIN CLIENT] Fetching stats from server...");
-      const response = await fetch("/api/admin/stats");
+      const response = await fetch(apiUrl("/api/admin/stats"));
       
       if (response.ok) {
         const data = await response.json();
@@ -481,7 +482,7 @@ export default function Admin() {
   const handleSaveTaxSettings = async () => {
     setSavingSettings(true);
     try {
-      const response = await fetch("/api/admin/settings/tax", {
+      const response = await fetch(apiUrl("/api/admin/settings/tax"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock } from "lucide-react";
 import { useState } from "react";
@@ -19,7 +20,7 @@ export default function Login() {
 
     try {
       console.log("🔍 [AUTH] Logging in user...", { email });
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

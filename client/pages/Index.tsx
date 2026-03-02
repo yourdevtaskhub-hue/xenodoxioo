@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl, imageUrl } from "@/lib/api";
 import { Link } from "react-router-dom";
 import {
   Calendar,
@@ -71,7 +72,7 @@ export default function Index() {
     const loadProperties = async () => {
       try {
         console.log("🔍 [CLIENT] Fetching featured properties...");
-        const response = await fetch("/api/properties");
+        const response = await fetch(apiUrl("/api/properties"));
 
         if (!response.ok) {
           throw new Error(`Failed to load properties: ${response.status}`);
@@ -218,7 +219,7 @@ export default function Index() {
                   {/* Image */}
                   <div className="relative h-64 overflow-hidden bg-muted">
                     <img
-                      src={property.mainImage || `https://images.unsplash.com/photo-1566073775-4b56bc6404798012d8f0b?ixlib=rb-4.0.3&ixid=MnwxhbT2Zj6q7&auto=format&fit=crop&w=800&q=80`}
+                      src={imageUrl(property.mainImage) || `https://images.unsplash.com/photo-1566073775-4b56bc6404798012d8f0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80`}
                       alt={property.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />

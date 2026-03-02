@@ -1,234 +1,225 @@
 import { motion } from "framer-motion";
-import { MapPin, Home, Users, Star, Phone, Mail } from "lucide-react";
-import { useLanguage } from "@/hooks/useLanguage";
+import { MapPin, Home, Users, Award } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import { apiUrl, imageUrl } from "@/lib/api";
 import Layout from "@/components/Layout";
+
+const FALLBACK_HERO = "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1920&q=85";
+const FALLBACK_INTERIOR = "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=85";
+const FALLBACK_SEA = "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1600&q=85";
+
+const fadeIn = {
+  initial: { opacity: 0, y: 24 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6 },
+};
+const containerVariants = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
 
 export default function About() {
   const { language, t } = useLanguage();
+  const [propertyImages, setPropertyImages] = useState<{
+    hero: string;
+    interior: string;
+    sea: string;
+  }>({ hero: FALLBACK_HERO, interior: FALLBACK_INTERIOR, sea: FALLBACK_SEA });
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(apiUrl("/api/properties"));
+        if (!res.ok || !mounted) return;
+        const json = await res.json();
+        const data = (json.data ?? []) as { mainImage?: string; galleryImages?: string[] }[];
+        if (data.length === 0) return;
+        const first = data[0];
+        const gallery = Array.isArray(first.galleryImages) ? first.galleryImages : [];
+        setPropertyImages({
+          hero: imageUrl(first.mainImage) || FALLBACK_HERO,
+          interior: imageUrl(gallery[1] ?? gallery[0] ?? first.mainImage) || FALLBACK_INTERIOR,
+          sea: imageUrl(gallery[2] ?? gallery[0] ?? first.mainImage) || FALLBACK_SEA,
+        });
+      } catch {
+        /* keep fallbacks */
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Hero Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-      >
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-black opacity-20"></div>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="relative z-10 py-24 lg:py-32">
-              <div className="text-center">
-                <motion.h1
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.2 }}
-                  className="text-4xl md:text-6xl font-bold tracking-tight"
-                >
-                  {language === "el" ? "LEONIDIONHOUSES" : "LEONIDIONHOUSES"}
-                </motion.h1>
-                <motion.p
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.4 }}
-                  className="mt-6 max-w-3xl mx-auto text-xl md:text-2xl text-blue-100"
-                >
-                  {language === "el" 
-                    ? "Κτίζουμε σε μια παραλία 25 στρεμμάτων με καταπληκτική θεά στον Αργολικό Κολπό και το Μυρτώο Πελαγός, μεταξύ του Τυρού και του Λεωνιδίου, τα 6 σπίτια μας προσφέρουν ανέση και ιδιωτικότητα σε ένα περιβάλλον απόλυτα γαληνιο."
-                    : "Building luxury villas for 25 years in the beautiful area between Argolikos Kolpos and Myrtoon Pelagos, between Tyros and Leonidion. Our 6 homes offer luxury and privacy in an absolutely authentic environment."
-                  }
-                </motion.p>
-              </div>
+      <div className="min-h-screen bg-[#fafaf9]">
+        {/* Hero — full-bleed image, refined overlay */}
+        <section className="relative h-[65vh] min-h-[420px] overflow-hidden">
+          <img
+            src={propertyImages.hero}
+            alt="Leonidion villas"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 flex items-end">
+            <div className="container-max w-full pb-16 md:pb-20">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.2 }}
+                className="max-w-2xl"
+              >
+                <h1 className="luxury-heading text-4xl md:text-5xl lg:text-6xl text-white tracking-tight">
+                  LEONIDIONHOUSES
+                </h1>
+                <p className="mt-4 text-lg md:text-xl text-white/90 font-light leading-relaxed">
+                  {t("about.hero.subtitle")}
+                </p>
+              </motion.div>
             </div>
           </div>
-        </div>
-      </motion.div>
+        </section>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-start">
-          {/* Left Column - Text Content */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
-            className="space-y-8"
-          >
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">
-                {language === "el" ? "Η Φιλοσοφία μας" : "Our Philosophy"}
-              </h2>
-              <div className="prose prose-lg text-gray-600 space-y-4">
-                <p>
-                  {language === "el"
-                    ? "Τα Leonidionhouses, που λειτουργούν από το 2011, είναι ήδη γνωστά από τις μεγαλύτερες πλατφόρμες ενοικίασης τουριστικών καταλυμάτων. Η ενασχόλησή μας με τη φιλοξενία και οι κριτικές των πελατών μας αποτελούν τα διαπιστευτήρια μας."
-                    : "Leonidionhouses, operating since 2011, are already known from the largest rental platforms for tourist accommodations. Our commitment to hospitality and our guests' reviews are our credentials."}
-                </p>
-                <p>
-                  {language === "el"
-                    ? "Πλέον, μεσώ της δικης μας ιστοσελίδας, είμαστε στην ευχαρίστη θέση να σας προσφέρουμε άμεση επικοινωνία και πλήρη εξυπηρέτηση σε ανταγωνιστικές τιμές."
-                    : "Furthermore, through our website, we are pleased to offer you immediate communication and complete service at competitive prices."}
-                </p>
-                <p>
-                  {language === "el"
-                    ? "Επισης, θέλω και στην αρχική σελίδα να αναφέρεται αυτό το κείμενο πριν την προβολή των δωματιών."
-                    : "Also, I want the home page to display this text before showing the rooms."}
-                </p>
-              </div>
-            </div>
-
-            {/* Features Grid */}
+        {/* Trust bar — subtle, credible */}
+        <section className="border-b border-border/60 bg-white/80 backdrop-blur-sm">
+          <div className="container-max py-8 md:py-10">
             <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8"
+              initial="initial"
+              animate="animate"
+              variants={containerVariants}
+              className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12"
             >
               {[
-                {
-                  icon: <MapPin className="w-8 h-8" />,
-                  title: language === "el" ? "Αποκλειστική Τοποθεσία" : "Prime Location",
-                  description: language === "el" 
-                    ? "Μεταξύ Αργολικού Κολπού και Μυρτώο Πελαγού"
-                    : "Between Argolikos Kolpos and Myrtoon Pelagos"
-                },
-                {
-                  icon: <Home className="w-8 h-8" />,
-                  title: language === "el" ? "Αρχιτεκτονική" : "Modern Architecture",
-                  description: language === "el"
-                    ? "Διαλεκτική σχεση με το περιβάλλον"
-                    : "Distinctive design with environment integration"
-                },
-                {
-                  icon: <Users className="w-8 h-8" />,
-                  title: language === "el" ? "Ιδιωτικότητα" : "Privacy & Luxury",
-                  description: language === "el"
-                    ? "Απόλυτα γαληνιο περιβάλλον"
-                    : "Absolutely private environment"
-                },
-                {
-                  icon: <Star className="w-8 h-8" />,
-                  title: language === "el" ? "Εμπειρία" : "25 Years Experience",
-                  description: language === "el"
-                    ? "Από το 2011 στην ενοικίαση"
-                    : "In rentals since 2011"
-                }
-              ].map((feature, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.1 * index + 1 }}
-                  className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300"
-                >
-                  <div className="flex items-center mb-4">
-                    <div className="p-3 bg-blue-100 rounded-lg text-blue-600">
-                      {feature.icon}
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 ml-4">
-                      {feature.title}
-                    </h3>
-                  </div>
-                  <p className="text-gray-600">
-                    {feature.description}
-                  </p>
+                { label: t("about.trust.years"), value: t("about.trust.yearsVal") },
+                { label: t("about.trust.properties"), value: t("about.trust.propertiesVal") },
+                { label: t("about.trust.guests"), value: "—" },
+                { label: t("about.trust.reviews"), value: "—" },
+              ].map((item, i) => (
+                <motion.div key={i} variants={fadeIn} className="text-center">
+                  <p className="text-2xl md:text-3xl luxury-heading text-foreground">{item.value}</p>
+                  <p className="mt-1 text-sm text-muted-foreground uppercase tracking-wider">{item.label}</p>
                 </motion.div>
               ))}
             </motion.div>
-          </motion.div>
+          </div>
+        </section>
 
-          {/* Right Column - Visual Content */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
-            className="space-y-8"
-          >
-            {/* Beach Image */}
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <motion.img
-                initial={{ scale: 1.1, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 1.2, delay: 0.8 }}
-                src="/beach-villa.jpg"
-                alt="Luxury beach villa"
-                className="w-full h-64 object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-            </div>
-
-            {/* Contact Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 1 }}
-              className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100"
-            >
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                {language === "el" ? "Επικοινωνήστε" : "Contact Us"}
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  <span className="text-gray-600">
-                    {language === "el" ? "+30 27540 51234" : "+30 27540 51234"}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  <span className="text-gray-600">info@leonidionhouses.com</span>
-                </div>
-              </div>
-
-              {/* Call to Action */}
+        {/* Philosophy — editorial storytelling */}
+        <section className="luxury-section-padding">
+          <div className="container-max">
+            <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 1.4 }}
-                className="mt-8"
+                initial={{ opacity: 0, x: -24 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.6 }}
+                className="order-2 lg:order-1"
               >
-                <Link
-                  to="/properties"
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-center py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-                >
-                  {language === "el" ? "Δείτε τα Σπίτια μας" : "View Our Properties"}
-                </Link>
+                <h2 className="luxury-heading text-3xl md:text-4xl text-foreground">
+                  {t("about.philosophy.title")}
+                </h2>
+                <div className="luxury-divider my-8" />
+                <div className="space-y-6 text-muted-foreground leading-relaxed text-base md:text-lg">
+                  <p>{t("about.philosophy.p1")}</p>
+                  <p>{t("about.philosophy.p2")}</p>
+                  <p>{t("about.philosophy.p3")}</p>
+                </div>
               </motion.div>
-            </motion.div>
-          </motion.div>
-        </div>
+              <motion.div
+                initial={{ opacity: 0, x: 24 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.6 }}
+                className="order-1 lg:order-2"
+              >
+                <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-luxury-md">
+                  <img
+                    src={propertyImages.interior}
+                    alt="Villa interior"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
 
-        {/* Bottom CTA Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.6 }}
-          className="mt-16 bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl p-12 text-center"
-        >
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            {language === "el" 
-              ? "Είστε έτοιμοι για την εμπειρία της ζωής σας;" 
-              : "Ready for the experience of a lifetime?"
-            }
-          </h2>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            {language === "el"
-              ? "Ανακαλύψτε τα όμορφα σπίτια μας και κάντε κράτηση για τις τέλειες διακοπές σας στο Λεωνίδιο σήμερα."
-              : "Discover our beautiful homes and book your perfect vacation in Leonidion today."
-            }
-          </p>
-          <Link
-            to="/properties"
-            className="inline-flex bg-blue-600 text-white text-lg font-semibold py-4 px-8 rounded-xl hover:bg-blue-700 transition-colors duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-          >
-            {language === "el" ? "Κάντε Κράτηση Τώρα" : "Book Now"}
-          </Link>
-        </motion.div>
+        {/* Features — minimal cards */}
+        <section className="py-16 md:py-24 bg-white">
+          <div className="container-max">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+              {[
+                { icon: MapPin, title: t("about.features.location"), desc: t("about.features.locationDesc") },
+                { icon: Home, title: t("about.features.architecture"), desc: t("about.features.architectureDesc") },
+                { icon: Users, title: t("about.features.privacy"), desc: t("about.features.privacyDesc") },
+                { icon: Award, title: t("about.features.experience"), desc: t("about.features.experienceDesc") },
+              ].map((item, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.08 }}
+                  className="group p-8 rounded-lg border border-border/50 hover:border-primary/30 transition-colors duration-300"
+                >
+                  <item.icon className="w-8 h-8 text-primary/80 mb-4" strokeWidth={1.25} />
+                  <h3 className="font-medium text-foreground text-lg">{item.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Large editorial image */}
+        <section className="py-0">
+          <div className="container-max">
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="aspect-[21/9] md:aspect-[3/1] rounded-lg overflow-hidden"
+            >
+              <img
+                src={propertyImages.sea}
+                alt="Sea view"
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+          </div>
+        </section>
+
+        {/* CTA — confident, minimal */}
+        <section className="luxury-section-padding bg-[#fafaf9]">
+          <div className="container-max text-center max-w-2xl mx-auto">
+            <h2 className="luxury-heading text-3xl md:text-4xl text-foreground">
+              {t("about.cta.title")}
+            </h2>
+            <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
+              {t("about.cta.subtitle")}
+            </p>
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                to="/properties"
+                className="luxury-btn-primary"
+              >
+                {t("about.cta.viewProperties")}
+              </Link>
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center border border-border px-8 py-3.5 font-medium text-foreground rounded-md hover:bg-muted/50 transition-colors"
+              >
+                {t("about.cta.bookNow")}
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
-  </Layout>
-);
+    </Layout>
+  );
 }

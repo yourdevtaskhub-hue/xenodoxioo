@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { apiUrl } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { Calendar, User, Settings, LogOut, Edit } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -58,7 +59,7 @@ export default function Dashboard() {
       const loadBookings = async () => {
         try {
           console.log("🔍 [DASHBOARD] Fetching user bookings...");
-          const response = await fetch("/api/bookings/user", {
+          const response = await fetch(apiUrl("/api/bookings/user"), {
             headers: {
               Authorization: `Bearer ${parsed.accessToken}`,
             },
@@ -118,7 +119,7 @@ export default function Dashboard() {
     if (!cancellingBooking || !auth?.accessToken) return;
     setCancelLoading(true);
     try {
-      const res = await fetch(`/api/bookings/${cancellingBooking.id}/cancel`, {
+      const res = await fetch(apiUrl(`/api/bookings/${cancellingBooking.id}/cancel`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
