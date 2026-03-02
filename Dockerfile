@@ -25,6 +25,7 @@ RUN npm run build
 
 # Production image, copy all the files and run the app
 FROM base AS runner
+RUN apk add --no-cache curl
 WORKDIR /app
 
 ENV NODE_ENV production
@@ -38,6 +39,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+
+# Create uploads dir with correct permissions (app needs to write here)
+RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
 
 # Set the correct permissions
 USER nextjs
