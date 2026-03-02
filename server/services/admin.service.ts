@@ -1,16 +1,48 @@
 import prisma from "../lib/db";
 import { NotFoundError, ValidationError, AppError } from "../lib/errors";
 
+// Simple in-memory storage for tax settings
+let taxSettingsCache = {
+  taxRate: 15,
+  additionalFees: 0,
+  updatedAt: new Date().toISOString()
+};
+
+/**
+ * Get current tax settings
+ */
+export async function getTaxSettings() {
+  return taxSettingsCache;
+}
+
+/**
+ * Update tax settings
+ */
+export async function updateTaxSettings(settings: { taxRate: number; additionalFees: number }) {
+  taxSettingsCache = {
+    taxRate: settings.taxRate,
+    additionalFees: settings.additionalFees,
+    updatedAt: new Date().toISOString()
+  };
+  console.log(" [ADMIN] Tax settings updated in cache:", taxSettingsCache);
+  return taxSettingsCache;
+}
+
 /**
  * Get admin dashboard statistics
  */
 export async function getAdminStats() {
+  console.log(" [ADMIN] Starting getAdminStats...");
+  
   try {
+    console.log(" [ADMIN] Fetching basic counts...");
+    
+    // Get basic counts
     const [
       totalBookings,
       confirmedBookings,
       pendingBookings,
-      totalRevenue,
+      revenueData,
       totalUsers,
       properties,
     ] = await Promise.all([
@@ -22,70 +54,79 @@ export async function getAdminStats() {
           _sum: { amount: true },
         }),
         prisma.user.count({ where: { role: "CUSTOMER" } }),
-        prisma.property.findMany({
-          include: {
-            _count: {
-              select: { units: true, bookings: true },
-            },
-          },
-        }),
+        prisma.property.findMany(),
       ]);
 
-    // Calculate occupancy
+    console.log(" [ADMIN] Basic counts:", {
+      totalBookings,
+      confirmedBookings,
+      pendingBookings,
+      totalUsers,
+      propertiesCount: properties.length
+    });
+
+    console.log(" [ADMIN] Processing properties for occupancy...");
+    
+    // Calculate occupancy for each property
     const occupancyByProperty = await Promise.all(
       properties.map(async (prop) => {
-        const totalDays = 365;
+        console.log(` [ADMIN] Processing property: ${prop.name}`);
+        
+        // Get units count for this property
+        const unitsCount = await prisma.unit.count({
+          where: { propertyId: prop.id }
+        });
+        
+        console.log(` [ADMIN] Property ${prop.name} has ${unitsCount} units`);
+        
+        // Get total booked nights for this property
         const bookedDays = await prisma.booking.aggregate({
           where: {
-            unit: { propertyId: prop.id },
+            unitId: {
+              in: (await prisma.unit.findMany({
+                where: { propertyId: prop.id },
+                select: { id: true }
+              })).map(unit => unit.id)
+            },
             status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
           },
           _sum: { nights: true },
         });
 
+        console.log(` [ADMIN] Property ${prop.name} has ${bookedDays._sum.nights || 0} booked nights`);
+
+        const totalDays = 365;
         const occupancyPercentage = Math.round(
-          ((bookedDays._sum.nights || 0) / (totalDays * prop._count.units)) * 100,
+          ((bookedDays._sum.nights || 0) / (totalDays * unitsCount)) * 100,
         );
+
+        console.log(` [ADMIN] Property ${prop.name} occupancy: ${occupancyPercentage}%`);
 
         return {
           id: prop.id,
           name: prop.name,
-          units: prop._count.units,
+          units: unitsCount,
           occupancyPercentage,
         };
-      }),
+      })
     );
 
-    return {
+    const stats = {
       totalBookings,
       confirmedBookings,
       pendingBookings,
-      totalRevenue: totalRevenue._sum.amount || 0,
+      totalRevenue: revenueData._sum.amount || 0,
       totalUsers,
       propertiesCount: properties.length,
       occupancyByProperty,
     };
-  } catch (error) {
-    // Always try to get real data from database
-    console.warn('Database error:', error);
+
+    console.log(" [ADMIN] Final stats:", stats);
+    return stats;
     
-    // Return sample data to show admin panel is working
-    return {
-      totalBookings: 2,
-      confirmedBookings: 1,
-      pendingBookings: 1,
-      totalRevenue: 925.00,
-      totalUsers: 2,
-      propertiesCount: 1,
-      occupancyByProperty: [
-        {
-          id: '1',
-          name: 'Luxury Villa',
-          units: 1,
-          occupancyPercentage: 87,
-        },
-      ],
-    };
+  } catch (error) {
+    console.error(" [ADMIN] Database error:", error);
+    throw new AppError(500, "Failed to load admin statistics");
   }
 }
 
@@ -121,7 +162,11 @@ export async function getAllBookings(
     prisma.booking.findMany({
       where,
       include: {
-        unit: { include: { property: true } },
+        unit: { 
+          include: { 
+            property: true 
+          } 
+        },
         user: true,
         payments: true,
       },
@@ -186,7 +231,6 @@ export async function createProperty(data: {
   country: string;
   mainImage: string;
   galleryImages?: string[];
-  amenities?: Array<{ name: string; description?: string; icon?: string }>;
 }) {
   // Validate
   if (!data.name || !data.description || !data.city) {
@@ -207,15 +251,9 @@ export async function createProperty(data: {
       city: data.city,
       country: data.country || "Greece",
       mainImage: data.mainImage,
-      galleryImages: data.galleryImages || [],
+      galleryImages: JSON.stringify(data.galleryImages || []),
       slug,
-      amenities: {
-        createMany: {
-          data: data.amenities || [],
-        },
-      },
     },
-    include: { amenities: true },
   });
 
   return property;

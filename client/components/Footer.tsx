@@ -13,9 +13,11 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">L</span>
-              </div>
+              <img 
+                src="/logoleo.png" 
+                alt="LEONIDIONHOUSES" 
+                className="w-12 h-12 rounded-lg"
+              />
               <span className="text-lg font-bold text-primary">
                 LEONIDION<span className="text-accent">HOUSES</span>
               </span>

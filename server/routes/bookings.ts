@@ -2,8 +2,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validation";
-import { authenticate } from "../middleware/auth";
+import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import * as bookingService from "../services/booking.service";
+import prisma from "../lib/db";
 
 const router = Router();
 
@@ -21,6 +22,13 @@ const getAvailableUnitsSchema = z.object({
     propertyId: z.string().optional(),
 });
 
+const quoteSchema = z.object({
+    unitId: z.string(),
+    checkInDate: z.string().datetime(),
+    checkOutDate: z.string().datetime(),
+    guests: z.coerce.number().min(1),
+});
+
 const createBookingSchema = z.object({
     unitId: z.string(),
     checkInDate: z.string().datetime(),
@@ -35,9 +43,24 @@ const createBookingSchema = z.object({
 
 const cancelBookingSchema = z.object({
     reason: z.string().optional(),
+    guestEmail: z.string().email().optional(),
 });
 
 // Routes
+
+// Get occupied date ranges for a unit (Public) – for calendar
+router.get("/occupied-dates", async (req, res, next) => {
+    try {
+        const unitId = req.query.unitId as string;
+        if (!unitId) {
+            return res.status(400).json({ success: false, error: "unitId required" });
+        }
+        const ranges = await bookingService.getOccupiedDateRanges(unitId);
+        res.json({ success: true, data: ranges });
+    } catch (error) {
+        next(error);
+    }
+});
 
 // Check Availability (Public)
 router.post(
@@ -79,10 +102,126 @@ router.post(
     },
 );
 
-// Create Booking (Authenticated)
+// Get booking quote for a unit (Public)
+router.post(
+    "/quote",
+    validate(quoteSchema),
+    async (req, res, next) => {
+        try {
+            const { unitId, checkInDate, checkOutDate, guests } = req.body;
+
+            const checkIn = new Date(checkInDate);
+            const checkOut = new Date(checkOutDate);
+
+            if (!(checkIn instanceof Date) || isNaN(checkIn.getTime()) ||
+                !(checkOut instanceof Date) || isNaN(checkOut.getTime())) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid check-in or check-out date",
+                });
+            }
+
+            if (checkIn >= checkOut) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Check-out date must be after check-in date",
+                });
+            }
+
+            const unit = await prisma.unit.findUnique({
+                where: { id: unitId },
+            });
+
+            if (!unit) {
+                return res
+                    .status(404)
+                    .json({ success: false, error: "Unit not found" });
+            }
+
+            if (guests > unit.maxGuests) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Maximum guests for this unit is ${unit.maxGuests}`,
+                });
+            }
+
+            // Check for overlapping bookings (simple availability)
+            const conflicting = await prisma.booking.findMany({
+                where: {
+                    unitId,
+                    status: {
+                        in: ["CONFIRMED", "DEPOSIT_PAID", "CHECKED_IN"],
+                    },
+                    OR: [
+                        {
+                            checkInDate: { lt: checkOut },
+                            checkOutDate: { gt: checkIn },
+                        },
+                    ],
+                },
+            });
+
+            if (conflicting.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    error: "Unit is not available for selected dates",
+                });
+            }
+
+            const nights = Math.ceil(
+                (checkOut.getTime() - checkIn.getTime()) /
+                    (1000 * 60 * 60 * 24),
+            );
+
+            if (nights < 1) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Minimum stay is 1 night",
+                });
+            }
+
+            const basePrice = unit.basePrice;
+            const subtotal = basePrice * nights;
+            const cleaningFee = unit.cleaningFee || 0;
+            const taxableAmount = subtotal + cleaningFee;
+            const taxes =
+                Math.round(taxableAmount * 0.15 * 100) / 100;
+            const totalPrice = subtotal + cleaningFee + taxes;
+            const depositAmount =
+                Math.round(totalPrice * 0.25 * 100) / 100;
+            const balanceAmount = totalPrice - depositAmount;
+
+            res.json({
+                success: true,
+                data: {
+                    unit: {
+                        id: unit.id,
+                        name: unit.name,
+                        maxGuests: unit.maxGuests,
+                        basePrice: unit.basePrice,
+                        cleaningFee: unit.cleaningFee,
+                    },
+                    pricing: {
+                        nights,
+                        subtotal,
+                        cleaningFee,
+                        taxes,
+                        totalPrice,
+                        depositAmount,
+                        balanceAmount,
+                    },
+                },
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+);
+
+// Create Booking (optional auth: guest checkout or attributed to user)
 router.post(
     "/",
-    authenticate,
+    optionalAuthenticate,
     validate(createBookingSchema),
     async (req, res, next) => {
         try {
@@ -98,9 +237,11 @@ router.post(
                 couponCode,
             } = req.body;
 
+            const userId = req.user?.userId ?? null;
+
             const booking = await bookingService.createBooking(
                 unitId,
-                req.user!.userId,
+                userId,
                 new Date(checkInDate),
                 new Date(checkOutDate),
                 guests,
@@ -135,30 +276,52 @@ router.get("/user", authenticate, async (req, res, next) => {
     }
 });
 
-// Get Booking Details (Authenticated)
-router.get("/:id", authenticate, async (req, res, next) => {
+// Get Booking Details (optional auth, or guest by email for guest bookings)
+router.get("/:id", optionalAuthenticate, async (req, res, next) => {
     try {
-        const booking = await bookingService.getBookingById(
-            req.params.id,
-            req.user!.userId,
-        );
+        const id = req.params.id;
+        let opts: { userId?: string; guestEmail?: string } = {};
+        if (req.user) {
+            opts = { userId: req.user.userId };
+        } else if (typeof req.query.email === "string" && req.query.email.trim()) {
+            opts = { guestEmail: req.query.email.trim() };
+        }
+        if (!opts.userId && !opts.guestEmail) {
+            return res.status(401).json({
+                success: false,
+                error: "Sign in or provide email to view this booking",
+            });
+        }
+        const booking = await bookingService.getBookingById(id, opts);
         res.json({ success: true, data: booking });
     } catch (error) {
         next(error);
     }
 });
 
-// Cancel Booking (Authenticated)
+// Cancel Booking (owner or guest by email for guest bookings)
 router.post(
     "/:id/cancel",
-    authenticate,
+    optionalAuthenticate,
     validate(cancelBookingSchema),
     async (req, res, next) => {
         try {
             const { reason } = req.body;
+            let opts: { userId?: string; guestEmail?: string } = {};
+            if (req.user) {
+                opts = { userId: req.user.userId };
+            } else if (typeof req.body.guestEmail === "string" && req.body.guestEmail.trim()) {
+                opts = { guestEmail: req.body.guestEmail.trim() };
+            }
+            if (!opts.userId && !opts.guestEmail) {
+                return res.status(401).json({
+                    success: false,
+                    error: "Sign in or provide guest email to cancel",
+                });
+            }
             const result = await bookingService.cancelBooking(
                 req.params.id,
-                req.user!.userId,
+                opts,
                 reason,
             );
             res.json({ success: true, data: result });

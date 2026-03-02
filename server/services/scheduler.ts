@@ -116,10 +116,6 @@ export class PaymentScheduler {
           status: PaymentStatus.FAILED,
           failureCount: { lt: maxRetries },
         },
-        include: {
-          booking: true,
-          user: true
-        }
       });
 
       for (const payment of failedPayments) {
@@ -133,14 +129,22 @@ export class PaymentScheduler {
         }
 
         try {
+          const booking = await prisma.booking.findUnique({
+            where: { id: payment.bookingId },
+          });
+
+          if (!booking) {
+            continue;
+          }
+
           // Create new payment intent
           const paymentIntent = await StripeService.createPaymentIntent(
             payment.amount,
             'usd',
-            payment.booking.stripeCustomerId || undefined,
+            booking.stripeCustomerId || undefined,
             {
               bookingId: payment.bookingId,
-              bookingNumber: payment.booking.bookingNumber,
+              bookingNumber: booking.bookingNumber,
               paymentType: payment.paymentType,
               userId: payment.userId,
               retryAttempt: (payment.failureCount + 1).toString()
@@ -158,7 +162,7 @@ export class PaymentScheduler {
             }
           });
 
-          console.log(`Retried payment for booking ${payment.booking.bookingNumber}, attempt ${payment.failureCount + 1}`);
+          console.log(`Retried payment for booking ${booking.bookingNumber}, attempt ${payment.failureCount + 1}`);
 
         } catch (error) {
           console.error(`Error retrying payment for booking ${payment.booking.bookingNumber}:`, error);
@@ -192,18 +196,17 @@ export class PaymentScheduler {
             lte: threeDaysFromNow
           }
         },
-        include: {
-          booking: {
-            include: {
-              user: true
-            }
-          }
-        }
       });
 
       for (const payment of upcomingPayments) {
+        const booking = await prisma.booking.findUnique({
+          where: { id: payment.bookingId },
+        });
+
+        if (!booking) continue;
+
         // TODO: Send email reminder
-        console.log(`Payment reminder sent for booking ${payment.booking.bookingNumber}`);
+        console.log(`Payment reminder sent for booking ${booking.bookingNumber}`);
       }
 
     } catch (error) {
@@ -281,7 +284,6 @@ export class PaymentScheduler {
     try {
       const booking = await prisma.booking.findUnique({
         where: { id: bookingId },
-        include: { user: true }
       });
 
       if (!booking) {

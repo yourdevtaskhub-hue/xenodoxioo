@@ -33,6 +33,24 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
+ * Optional auth: sets req.user if valid Bearer token present, otherwise continues without user.
+ */
+export function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return next();
+    }
+    try {
+        const token = authHeader.split(" ")[1];
+        const payload = verifyToken(token);
+        req.user = payload;
+    } catch {
+        // ignore invalid token
+    }
+    next();
+}
+
+/**
  * Middleware to authorize requests based on user role
  */
 export function authorize(roles: ("CUSTOMER" | "ADMIN")[]) {

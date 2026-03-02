@@ -6,38 +6,525 @@ import {
   Users,
   Settings,
   BookOpen,
+  Tag,
+  CalendarRange,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+import { useNavigate } from "react-router-dom";
+import PropertyManagement from "@/components/admin/PropertyManagement";
+import BookingManagement from "@/components/admin/BookingManagement";
+import UserManagement from "@/components/admin/UserManagement";
+
+const defaultCouponForm = {
+  code: "",
+  description: "",
+  discountType: "PERCENTAGE" as "PERCENTAGE" | "FIXED",
+  discountValue: 10,
+  validFrom: "",
+  validUntil: "",
+  minBookingAmount: "",
+  maxUses: "",
+  isActive: true,
+};
+
+function PricingAndDiscounts() {
+  const { language, t } = useLanguage();
+  const [seasonalPricing, setSeasonalPricing] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [couponFormOpen, setCouponFormOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
+  const [couponForm, setCouponForm] = useState(defaultCouponForm);
+  const [couponSaving, setCouponSaving] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchPricing = async () => {
+    try {
+      const res = await fetch("/api/admin/pricing");
+      if (res.ok) {
+        const data = await res.json();
+        setSeasonalPricing(data.seasonalPricing || []);
+        setCoupons(data.coupons || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch pricing:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPricing();
+  }, []);
+
+  const openCreateCoupon = () => {
+    setEditingCoupon(null);
+    setCouponForm({
+      ...defaultCouponForm,
+      validFrom: new Date().toISOString().slice(0, 10),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    });
+    setCouponFormOpen(true);
+    setCouponError(null);
+  };
+
+  const openEditCoupon = (c: any) => {
+    setEditingCoupon(c);
+    setCouponForm({
+      code: c.code,
+      description: c.description ?? "",
+      discountType: c.discountType,
+      discountValue: c.discountValue,
+      validFrom: new Date(c.validFrom).toISOString().slice(0, 10),
+      validUntil: new Date(c.validUntil).toISOString().slice(0, 10),
+      minBookingAmount: c.minBookingAmount != null ? String(c.minBookingAmount) : "",
+      maxUses: c.maxUses != null ? String(c.maxUses) : "",
+      isActive: c.isActive,
+    });
+    setCouponFormOpen(true);
+    setCouponError(null);
+  };
+
+  const closeCouponForm = () => {
+    setCouponFormOpen(false);
+    setEditingCoupon(null);
+    setCouponError(null);
+  };
+
+  const submitCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponSaving(true);
+    setCouponError(null);
+    const validFrom = new Date(couponForm.validFrom + "T00:00:00").toISOString();
+    const validUntil = new Date(couponForm.validUntil + "T23:59:59").toISOString();
+    const body = {
+      code: couponForm.code.trim().toUpperCase(),
+      description: couponForm.description.trim() || undefined,
+      discountType: couponForm.discountType,
+      discountValue: Number(couponForm.discountValue),
+      validFrom,
+      validUntil,
+      minBookingAmount: couponForm.minBookingAmount ? Number(couponForm.minBookingAmount) : undefined,
+      maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : undefined,
+      isActive: couponForm.isActive,
+    };
+    try {
+      if (editingCoupon) {
+        const res = await fetch(`/api/admin/coupons/${editingCoupon.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCouponError(data.error || "Failed to update");
+          return;
+        }
+        closeCouponForm();
+        await fetchPricing();
+        alert(t("admin.couponUpdated"));
+      } else {
+        const res = await fetch("/api/admin/coupons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCouponError(data.error === "A coupon with this code already exists" ? t("admin.couponCodeExists") : (data.error || "Failed to create"));
+          return;
+        }
+        closeCouponForm();
+        await fetchPricing();
+        alert(t("admin.couponCreated"));
+      }
+    } finally {
+      setCouponSaving(false);
+    }
+  };
+
+  const deleteCoupon = async (id: string) => {
+    if (!confirm(t("admin.deleteCouponConfirm"))) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/coupons/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchPricing();
+        alert(t("admin.couponDeleted"));
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-foreground mb-6">
+        {t("admin.pricing")}
+      </h2>
+
+      {loading ? (
+        <p className="text-muted-foreground">{t("common.loading")}</p>
+      ) : (
+        <div className="space-y-8">
+          <div className="bg-card border border-border rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <CalendarRange size={20} />
+              {t("admin.seasonalPricing")}
+            </h3>
+            {seasonalPricing.length === 0 ? (
+              <p className="text-muted-foreground">
+                {t("admin.noSeasonalPricing")}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.property")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.name")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.start")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.end")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.pricePerNight")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.minStay")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seasonalPricing.map((s) => (
+                      <tr key={s.id} className="border-b border-border/50">
+                        <td className="py-2 text-foreground">{s.property?.name ?? "—"}</td>
+                        <td className="py-2 text-foreground">{s.name}</td>
+                        <td className="py-2 text-muted-foreground">
+                          {new Date(s.startDate).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {new Date(s.endDate).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 font-medium text-foreground">
+                          {formatCurrency(s.pricePerNight, language)}
+                        </td>
+                        <td className="py-2 text-muted-foreground">{s.minStayDays} {t("common.nights")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-card border border-border rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Tag size={20} />
+                {t("admin.coupons")}
+              </h3>
+              <button
+                type="button"
+                onClick={openCreateCoupon}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium"
+              >
+                <Plus size={18} />
+                {t("admin.addCoupon")}
+              </button>
+            </div>
+
+            {couponFormOpen && (
+              <form onSubmit={submitCoupon} className="mb-6 p-4 bg-muted/50 rounded-lg space-y-4">
+                {couponError && (
+                  <p className="text-sm text-destructive">{couponError}</p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.code")}</label>
+                    <input
+                      type="text"
+                      value={couponForm.code}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, code: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                      placeholder="SUMMER20"
+                      required
+                      disabled={!!editingCoupon}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.type")}</label>
+                    <select
+                      value={couponForm.discountType}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, discountType: e.target.value as "PERCENTAGE" | "FIXED" }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                    >
+                      <option value="PERCENTAGE">{t("admin.percentage")}</option>
+                      <option value="FIXED">{t("admin.fixed")}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.value")}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step={couponForm.discountType === "PERCENTAGE" ? "1" : "0.01"}
+                      value={couponForm.discountValue}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, discountValue: Number(e.target.value) || 0 }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                      required
+                    />
+                    {couponForm.discountType === "PERCENTAGE" ? "%" : "€"}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.validFrom")}</label>
+                    <input
+                      type="date"
+                      value={couponForm.validFrom}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, validFrom: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.validUntil")}</label>
+                    <input
+                      type="date"
+                      value={couponForm.validUntil}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, validUntil: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.description")}</label>
+                    <input
+                      type="text"
+                      value={couponForm.description}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, description: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.minBookingAmount")}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={couponForm.minBookingAmount}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, minBookingAmount: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1">{t("admin.maxUses")}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={couponForm.maxUses}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, maxUses: e.target.value }))}
+                      className="w-full px-3 py-2 border border-border rounded-lg text-foreground"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="coupon-active"
+                      checked={couponForm.isActive}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, isActive: e.target.checked }))}
+                      className="rounded border-border"
+                    />
+                    <label htmlFor="coupon-active" className="text-sm font-medium text-foreground">{t("admin.isActive")}</label>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={couponSaving} className="btn-primary">
+                    {couponSaving ? t("common.loading") : editingCoupon ? t("common.save") : t("admin.createCoupon")}
+                  </button>
+                  <button type="button" onClick={closeCouponForm} className="btn-secondary">
+                    {t("common.cancel")}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {coupons.length === 0 ? (
+              <p className="text-muted-foreground">
+                {t("admin.noCouponsYet")}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.code")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.type")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.value")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.validFrom")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.validUntil")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.used")}</th>
+                      <th className="text-left py-2 font-medium text-foreground">{t("admin.active")}</th>
+                      <th className="text-left py-2 font-medium text-foreground w-24"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coupons.map((c) => (
+                      <tr key={c.id} className="border-b border-border/50">
+                        <td className="py-2 font-mono font-medium text-foreground">{c.code}</td>
+                        <td className="py-2 text-muted-foreground">{c.discountType}</td>
+                        <td className="py-2 text-foreground">
+                          {c.discountType === "PERCENTAGE" ? `${c.discountValue}%` : formatCurrency(c.discountValue, language)}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {new Date(c.validFrom).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {new Date(c.validUntil).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {c.usedCount}{c.maxUses != null ? ` / ${c.maxUses}` : ""}
+                        </td>
+                        <td className="py-2">
+                          <span className={c.isActive ? "text-green-600" : "text-muted-foreground"}>
+                            {c.isActive ? t("common.yes") : t("common.no")}
+                          </span>
+                        </td>
+                        <td className="py-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditCoupon(c)}
+                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded"
+                            title={t("common.edit")}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteCoupon(c.id)}
+                            disabled={deletingId === c.id}
+                            className="p-1.5 text-destructive hover:bg-destructive/10 rounded disabled:opacity-50"
+                            title={t("admin.deleteCoupon")}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            {t("admin.pricingFooterNote")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const { language, t } = useLanguage();
+  const [stats, setStats] = useState({
+    totalBookings: 0,
+    confirmedBookings: 0,
+    pendingBookings: 0,
+    totalRevenue: 0,
+    totalUsers: 0,
+    propertiesCount: 0,
+    occupancyByProperty: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  const stats = [
+  // Tax settings state
+  const [taxSettings, setTaxSettings] = useState({
+    taxRate: 15,
+    additionalFees: 0,
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(() => {
+    // Check if admin is logged in
+    const admin = localStorage.getItem("admin");
+    if (!admin) {
+      navigate("/admin/login");
+      return;
+    }
+
+    // Fetch admin stats
+    fetchStats();
+  }, [navigate]);
+
+  const fetchStats = async () => {
+    try {
+      console.log("🔍 [ADMIN CLIENT] Fetching stats from server...");
+      const response = await fetch("/api/admin/stats");
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("✅ [ADMIN CLIENT] Stats received:", data);
+        setStats(data);
+      } else {
+        console.error("❌ [ADMIN CLIENT] Failed to fetch stats:", response.status);
+      }
+    } catch (error) {
+      console.error("❌ [ADMIN CLIENT] Network error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveTaxSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const response = await fetch("/api/admin/settings/tax", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(taxSettings),
+      });
+
+      if (response.ok) {
+        alert(t("admin.settingsSaved"));
+      } else {
+        alert(t("admin.settingsSaveError"));
+      }
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      alert(t("admin.settingsSaveError"));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const statsCards = [
     {
       label: t("admin.totalBookings"),
-      value: "48",
+      value: stats.totalBookings.toString(),
       icon: BookOpen,
       color: "bg-blue-100 text-blue-700",
     },
     {
       label: t("admin.revenue"),
-      value: formatCurrency(12450, language),
+      value: formatCurrency(stats.totalRevenue, language),
       icon: DollarSign,
       color: "bg-green-100 text-green-700",
     },
     {
       label: t("admin.totalUsers"),
-      value: "156",
+      value: stats.totalUsers.toString(),
       icon: Users,
       color: "bg-purple-100 text-purple-700",
     },
     {
-      label: t("admin.occupancy"),
-      value: "87%",
-      icon: Calendar,
+      label: t("admin.properties"),
+      value: stats.propertiesCount.toString(),
+      icon: Settings,
       color: "bg-orange-100 text-orange-700",
     },
   ];
@@ -90,12 +577,12 @@ export default function Admin() {
           {activeTab === "dashboard" && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">
-                Dashboard Overview
+                {t("admin.dashboardOverview")}
               </h2>
 
               {/* Stats Grid */}
               <div className="grid md:grid-cols-4 gap-6 mb-8">
-                {stats.map((stat, idx) => {
+                {statsCards.map((stat, idx) => {
                   const Icon = stat.icon;
                   return (
                     <div
@@ -122,55 +609,55 @@ export default function Admin() {
               <div className="grid lg:grid-cols-2 gap-8">
                 <div className="bg-card border border-border rounded-lg p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4">
-                    Recent Bookings
+                    {t("admin.recentBookings")}
                   </h3>
                   <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="pb-4 border-b border-border last:border-0"
-                      >
-                        <p className="font-semibold text-foreground">
-                          Villa A - Booking #{1000 + i}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          2024-12-{15 + i} to 2024-12-{18 + i}
-                        </p>
-                        <p className="text-sm font-semibold text-green-600 mt-1">
-                          Confirmed
-                        </p>
+                    {loading ? (
+                      <p className="text-muted-foreground">{t("admin.loadingBookings")}</p>
+                    ) : stats.totalBookings > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-green-600">✅ {t("admin.confirmedBookingsCount").replace("{count}", String(stats.confirmedBookings))}</p>
+                        <p className="text-sm text-yellow-600">⏳ {t("admin.pendingBookingsCount").replace("{count}", String(stats.pendingBookings))}</p>
+                        <p className="text-sm text-blue-600">💰 {t("admin.totalBookingsCount").replace("{count}", String(stats.totalBookings))}</p>
                       </div>
-                    ))}
+                    ) : (
+                      <p className="text-muted-foreground">{t("admin.noBookingsFound")}</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="bg-card border border-border rounded-lg p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4">
-                    Occupancy by Property
+                    {t("admin.occupancyByProperty")}
                   </h3>
                   <div className="space-y-4">
-                    {[
-                      "The Lykoskufi Villas",
-                      "The Ogra House",
-                      "The Bungalows",
-                    ].map((property, i) => (
-                      <div key={i}>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="font-semibold text-foreground">
-                            {property}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {85 + i}%
-                          </span>
+                    {loading ? (
+                      <p className="text-muted-foreground">{t("admin.loadingOccupancy")}</p>
+                    ) : stats.occupancyByProperty.length > 0 ? (
+                      stats.occupancyByProperty.map((property) => (
+                        <div key={property.id}>
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="font-semibold text-foreground">
+                              {property.name}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {property.occupancyPercentage}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${property.occupancyPercentage}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t("admin.unitsCount").replace("{count}", String(property.units))}
+                          </p>
                         </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full"
-                            style={{ width: `${85 + i}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">{t("admin.noOccupancyData")}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -179,113 +666,75 @@ export default function Admin() {
 
           {/* Bookings Tab */}
           {activeTab === "bookings" && (
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Booking Management
-              </h2>
-              <div className="bg-card border border-border rounded-lg p-6">
-                <p className="text-muted-foreground text-center py-12">
-                  Booking management interface - View, modify, and cancel
-                  bookings. Manage cancellation policies and refunds.
-                </p>
-              </div>
-            </div>
+            <BookingManagement />
           )}
 
           {/* Pricing Tab */}
           {activeTab === "pricing" && (
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Pricing & Discounts
-              </h2>
-              <div className="bg-card border border-border rounded-lg p-6">
-                <p className="text-muted-foreground text-center py-12">
-                  Manage seasonal pricing, minimum stay rules, coupons,
-                  long-stay discounts, and extras pricing.
-                </p>
-              </div>
-            </div>
+            <PricingAndDiscounts />
           )}
 
           {/* Properties Tab */}
           {activeTab === "properties" && (
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Property Management
-              </h2>
-              <div className="bg-card border border-border rounded-lg p-6">
-                <p className="text-muted-foreground text-center py-12">
-                  Manage properties, units, amenities, gallery images, and
-                  availability calendars. Block dates manually.
-                </p>
-              </div>
-            </div>
+            <PropertyManagement />
           )}
 
           {/* Users Tab */}
           {activeTab === "users" && (
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                User Management
-              </h2>
-              <div className="bg-card border border-border rounded-lg p-6">
-                <p className="text-muted-foreground text-center py-12">
-                  View all users, apply custom discounts, manage user roles and
-                  permissions, handle refunds.
-                </p>
-              </div>
-            </div>
+            <UserManagement />
           )}
 
           {/* Settings Tab */}
           {activeTab === "settings" && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-6">
-                Settings
+                {t("admin.settings")}
               </h2>
               <div className="grid gap-6 max-w-2xl">
                 <div className="bg-card border border-border rounded-lg p-6">
                   <h3 className="font-bold text-foreground mb-4">
-                    Email Templates
+                    {t("admin.taxSettings")}
                   </h3>
                   <p className="text-muted-foreground text-sm mb-4">
-                    Customize booking confirmation, payment reminders, arrival
-                    reminders, and cancellation emails.
+                    {t("admin.taxSettingsDesc")}
                   </p>
-                  <button className="btn-primary">Edit Email Templates</button>
-                </div>
-
-                <div className="bg-card border border-border rounded-lg p-6">
-                  <h3 className="font-bold text-foreground mb-4">
-                    Cancellation Policy
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    Configure default cancellation rules and manage automatic
-                    refunds.
-                  </p>
-                  <button className="btn-primary">
-                    Edit Cancellation Policy
-                  </button>
-                </div>
-
-                <div className="bg-card border border-border rounded-lg p-6">
-                  <h3 className="font-bold text-foreground mb-4">
-                    Tax Settings
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    Configure VAT and tax percentages for pricing calculations.
-                  </p>
-                  <button className="btn-primary">Edit Tax Settings</button>
-                </div>
-
-                <div className="bg-card border border-border rounded-lg p-6">
-                  <h3 className="font-bold text-foreground mb-4">
-                    Stripe Integration
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    Connect your Stripe account for payment processing.
-                  </p>
-                  <button className="btn-secondary">Configure Stripe</button>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Tax Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={taxSettings.taxRate}
+                        onChange={(e) => setTaxSettings({...taxSettings, taxRate: parseFloat(e.target.value) || 0})}
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Additional Fees (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={taxSettings.additionalFees}
+                        onChange={(e) => setTaxSettings({...taxSettings, additionalFees: parseFloat(e.target.value) || 0})}
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                      />
+                    </div>
+                    <button 
+                      onClick={handleSaveTaxSettings}
+                      disabled={savingSettings}
+                      className="btn-primary"
+                    >
+                      {savingSettings ? t("common.saving") : t("admin.saveSettings")}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

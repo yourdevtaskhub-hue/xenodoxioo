@@ -1,12 +1,46 @@
 import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Menu, X, User, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
   const { t } = useLanguage();
+
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = () => {
+      try {
+        const auth = localStorage.getItem("auth");
+        if (auth) {
+          const parsed = JSON.parse(auth);
+          setIsLoggedIn(true);
+          setUserEmail(parsed.email || "");
+        } else {
+          setIsLoggedIn(false);
+          setUserEmail("");
+        }
+      } catch {
+        setIsLoggedIn(false);
+        setUserEmail("");
+      }
+    };
+
+    checkAuth();
+    // Listen for storage changes
+    window.addEventListener("storage", checkAuth);
+    return () => window.removeEventListener("storage", checkAuth);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("auth");
+    setIsLoggedIn(false);
+    setUserEmail("");
+    window.location.href = "/";
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border">
@@ -14,9 +48,11 @@ export default function Navigation() {
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">L</span>
-            </div>
+            <img 
+              src="/logoleo.png" 
+              alt="LEONIDIONHOUSES" 
+              className="w-12 h-12 rounded-lg"
+            />
             <span className="text-xl font-bold text-primary hidden sm:inline">
               LEONIDION<span className="text-accent">HOUSES</span>
             </span>
@@ -30,32 +66,53 @@ export default function Navigation() {
             >
               {t("nav.properties")}
             </Link>
-            <a
-              href="#about"
+            <Link
+              to="/about"
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
               {t("nav.about")}
-            </a>
-            <a
-              href="#contact"
+            </Link>
+            <Link
+              to="/contact"
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
               {t("nav.contact")}
-            </a>
+            </Link>
           </div>
 
           {/* Auth & Actions */}
           <div className="hidden md:flex items-center gap-4">
             <LanguageSwitcher />
-            <Link
-              to="/login"
-              className="text-foreground hover:text-primary transition-colors font-medium"
-            >
-              {t("nav.signIn")}
-            </Link>
-            <Link to="/properties" className="btn-primary">
-              {t("nav.bookNow")}
-            </Link>
+            {isLoggedIn ? (
+              <>
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
+                  <User size={16} className="text-green-600" />
+                  <span className="text-sm font-medium text-green-700">Connected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{userEmail}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+                    title="Logout"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-foreground hover:text-primary transition-colors font-medium"
+                >
+                  {t("nav.signIn")}
+                </Link>
+                <Link to="/properties" className="btn-primary">
+                  {t("nav.bookNow")}
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile: Language Switcher and Menu Button */}
@@ -80,28 +137,47 @@ export default function Navigation() {
             >
               {t("nav.properties")}
             </Link>
-            <a
-              href="#about"
+            <Link
+              to="/about"
               className="block py-2 text-foreground hover:text-primary transition-colors"
             >
               {t("nav.about")}
-            </a>
-            <a
-              href="#contact"
+            </Link>
+            <Link
+              to="/contact"
               className="block py-2 text-foreground hover:text-primary transition-colors"
             >
               {t("nav.contact")}
-            </a>
+            </Link>
             <div className="flex flex-col gap-2 pt-4 border-t border-border mt-4">
-              <Link
-                to="/login"
-                className="text-foreground hover:text-primary transition-colors font-medium text-left"
-              >
-                {t("nav.signIn")}
-              </Link>
-              <Link to="/properties" className="btn-primary w-full text-center">
-                {t("nav.bookNow")}
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full w-fit">
+                    <User size={16} className="text-green-600" />
+                    <span className="text-sm font-medium text-green-700">Connected</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">{userEmail}</div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors font-medium text-left"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-foreground hover:text-primary transition-colors font-medium text-left"
+                  >
+                    {t("nav.signIn")}
+                  </Link>
+                  <Link to="/properties" className="btn-primary w-full text-center">
+                    {t("nav.bookNow")}
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

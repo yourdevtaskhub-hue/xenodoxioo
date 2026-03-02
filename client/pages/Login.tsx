@@ -1,23 +1,55 @@
 import Layout from "@/components/Layout";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Login() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Mock authentication
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      console.log("🔍 [AUTH] Logging in user...", { email });
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const json = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        console.error("❌ [AUTH] Login failed:", json);
+        setError(json.error || "Invalid email or password.");
+        return;
+      }
+
+      const data = json.data;
+      if (!data || !data.accessToken || !data.user) {
+        setError("Unexpected response from server.");
+        return;
+      }
+
+      localStorage.setItem("auth", JSON.stringify(data));
+      console.log("✅ [AUTH] Login successful, redirecting to dashboard");
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("❌ [AUTH] Network error during login", err);
+      setError("Network error. Please try again.");
+    } finally {
       setIsLoading(false);
-      alert("Login successful! Redirect to dashboard.");
-    }, 1500);
+    }
   };
 
   return (
@@ -99,6 +131,12 @@ export default function Login() {
               {isLoading ? t("auth.signingIn") : t("auth.signInButton")}
             </button>
           </form>
+
+          {error && (
+            <p className="mt-4 text-sm text-destructive text-center">
+              {error}
+            </p>
+          )}
 
           {/* Divider */}
           <div className="my-6 flex items-center gap-4">

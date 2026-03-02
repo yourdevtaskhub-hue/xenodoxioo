@@ -1,27 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface AvailabilityCalendarProps {
+  unitId?: string;
   onSelectDates?: (checkIn: Date, checkOut: Date) => void;
 }
 
 export default function AvailabilityCalendar({
+  unitId,
   onSelectDates,
 }: AvailabilityCalendarProps) {
+  const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
+  const [occupiedRanges, setOccupiedRanges] = useState<{ start: string; end: string }[]>([]);
 
-  // Booked dates for demo (in production, fetch from API)
-  const bookedDates = new Set([
-    new Date(2024, 10, 15).toDateString(),
-    new Date(2024, 10, 16).toDateString(),
-    new Date(2024, 10, 17).toDateString(),
-    new Date(2024, 11, 20).toDateString(),
-    new Date(2024, 11, 21).toDateString(),
-  ]);
-
-  const blockedDates = new Set([new Date(2024, 11, 25).toDateString()]);
+  useEffect(() => {
+    if (!unitId) {
+      setOccupiedRanges([]);
+      return;
+    }
+    const fetchOccupied = async () => {
+      try {
+        const res = await fetch(`/api/bookings/occupied-dates?unitId=${encodeURIComponent(unitId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          setOccupiedRanges(json.data || []);
+        }
+      } catch {
+        setOccupiedRanges([]);
+      }
+    };
+    fetchOccupied();
+  }, [unitId]);
 
   const daysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -37,12 +50,6 @@ export default function AvailabilityCalendar({
       currentMonth.getMonth(),
       day,
     );
-    const dateStr = selectedDate.toDateString();
-
-    // Can't select booked or blocked dates
-    if (bookedDates.has(dateStr) || blockedDates.has(dateStr)) {
-      return;
-    }
 
     if (!checkIn || (checkIn && checkOut)) {
       setCheckIn(selectedDate);
@@ -85,16 +92,14 @@ export default function AvailabilityCalendar({
       currentMonth.getMonth(),
       day,
     );
-    return bookedDates.has(date.toDateString());
+    const dateStr = date.toISOString().slice(0, 10);
+    return occupiedRanges.some((range) => {
+      return dateStr >= range.start && dateStr < range.end;
+    });
   };
 
   const isBlocked = (day: number) => {
-    const date = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth(),
-      day,
-    );
-    return blockedDates.has(date.toDateString());
+    return false;
   };
 
   const monthName = currentMonth.toLocaleString("default", {
@@ -193,10 +198,12 @@ export default function AvailabilityCalendar({
           <div className="w-3 h-3 bg-primary/20 rounded" />
           <span className="text-foreground">In range</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-destructive rounded" />
-          <span className="text-foreground">Unavailable</span>
-        </div>
+        {occupiedRanges.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-muted rounded opacity-50" />
+            <span className="text-muted-foreground">{t("calendar.bookedUnavailable")}</span>
+          </div>
+        )}
       </div>
 
       {/* Selected Dates Display */}

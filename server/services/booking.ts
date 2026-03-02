@@ -426,11 +426,6 @@ export class BookingService {
         status: {
           in: [BookingStatus.DEPOSIT_PAID, BookingStatus.PENDING]
         }
-      },
-      include: {
-        user: true,
-        unit: true,
-        payments: true
       }
     });
   }

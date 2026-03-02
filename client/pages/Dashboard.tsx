@@ -1,51 +1,158 @@
 import Layout from "@/components/Layout";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Calendar, User, Settings, LogOut, Edit } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
 
+type DashboardBooking = {
+  id: string;
+  propertyName: string;
+  checkIn: string;
+  checkOut: string;
+  status: string;
+  total: number;
+};
+
+type AuthState = {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  };
+  accessToken: string;
+  refreshToken: string;
+};
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("bookings");
-
-  // Mock user data
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "+1 (555) 123-4567",
-    joinDate: "2024-01-15",
-  };
-
-  // Mock bookings
-  const bookings = [
-    {
-      id: 1,
-      property: "The Lykoskufi Villas - Villa A",
-      checkIn: "2024-12-15",
-      checkOut: "2024-12-18",
-      status: "confirmed",
-      total: 850,
-    },
-    {
-      id: 2,
-      property: "The Ogra House",
-      checkIn: "2024-01-20",
-      checkOut: "2024-01-27",
-      status: "pending",
-      total: 1540,
-    },
-  ];
+  const [auth, setAuth] = useState<AuthState | null>(null);
+  const [bookings, setBookings] = useState<DashboardBooking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+  const [cancellingBooking, setCancellingBooking] = useState<DashboardBooking | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const navigate = useNavigate();
   const { t, language } = useLanguage();
 
+  const userName =
+    auth ? `${auth.user.firstName} ${auth.user.lastName}` : t("dashboard.guest");
+
+  useEffect(() => {
+    const raw = localStorage.getItem("auth");
+    if (!raw) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as AuthState;
+      if (!parsed.accessToken || !parsed.user) {
+        navigate("/login");
+        return;
+      }
+      setAuth(parsed);
+
+      const loadBookings = async () => {
+        try {
+          console.log("🔍 [DASHBOARD] Fetching user bookings...");
+          const response = await fetch("/api/bookings/user", {
+            headers: {
+              Authorization: `Bearer ${parsed.accessToken}`,
+            },
+          });
+
+          const json = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            console.error("❌ [DASHBOARD] Failed to load bookings:", json);
+            setBookingsError(json.error || "Unable to load bookings.");
+            return;
+          }
+
+          const data = json.data;
+          const mapped: DashboardBooking[] = (data.bookings ?? []).map(
+            (b: any) => ({
+              id: b.id,
+              propertyName: b.unit?.property?.name ?? "Property",
+              checkIn: b.checkInDate
+                ? new Date(b.checkInDate).toISOString().split("T")[0]
+                : "",
+              checkOut: b.checkOutDate
+                ? new Date(b.checkOutDate).toISOString().split("T")[0]
+                : "",
+              status: (b.status || "PENDING").toLowerCase(),
+              total: b.totalPrice ?? 0,
+            }),
+          );
+
+          setBookings(mapped);
+        } catch (error) {
+          console.error("❌ [DASHBOARD] Network error while loading bookings", error);
+          setBookingsError("Network error. Please try again.");
+        } finally {
+          setLoadingBookings(false);
+        }
+      };
+
+      loadBookings();
+    } catch (error) {
+      console.error("❌ [DASHBOARD] Invalid auth data", error);
+      localStorage.removeItem("auth");
+      navigate("/login");
+    }
+  }, [navigate]);
+
   const handleLogout = () => {
-    alert("Logged out! Redirect to home.");
-    window.location.href = "/";
+    localStorage.removeItem("auth");
+    navigate("/");
   };
+
+  const handleCancelClick = (booking: DashboardBooking) => {
+    setCancellingBooking(booking);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!cancellingBooking || !auth?.accessToken) return;
+    setCancelLoading(true);
+    try {
+      const res = await fetch(`/api/bookings/${cancellingBooking.id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth.accessToken}`,
+        },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setCancellingBooking(null);
+        setBookings((prev) => prev.filter((b) => b.id !== cancellingBooking.id));
+      } else {
+        alert(json.error || t("dashboard.cancelError"));
+      }
+    } catch {
+      alert(t("dashboard.cancelError"));
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const canCancelBooking = (status: string) =>
+    ["pending", "confirmed", "deposit_paid"].includes(status);
 
   return (
     <Layout>
       <div className="container-max py-12">
-        <h1 className="text-3xl font-bold text-foreground mb-8">{t("dashboard.title")}</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          {t("dashboard.title")}
+        </h1>
+        <p className="text-muted-foreground mb-8">
+          {t("dashboard.welcome")},{" "}
+          <span className="font-semibold text-foreground">{userName}</span>
+        </p>
 
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Sidebar */}
@@ -58,9 +165,9 @@ export default function Dashboard() {
                     <User size={24} className="text-primary" />
                   </div>
                   <div>
-                    <p className="font-bold text-foreground">{user.name}</p>
+                    <p className="font-bold text-foreground">{userName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {user.email}
+                      {auth?.user.email}
                     </p>
                   </div>
                 </div>
@@ -111,59 +218,80 @@ export default function Dashboard() {
                   {t("dashboard.myBookings")}
                 </h2>
                 <div className="space-y-4">
-                  {bookings.map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="bg-card border border-border rounded-lg p-6"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-bold text-foreground">
-                            {booking.property}
-                          </h3>
-                          <p className="text-muted-foreground text-sm">
-                            {t("dashboard.bookingId")} : #{booking.id}
-                          </p>
+                  {loadingBookings && (
+                    <p className="text-muted-foreground">
+                      {t("dashboard.loadingBookings")}
+                    </p>
+                  )}
+
+                  {bookingsError && (
+                    <p className="text-destructive text-sm">
+                      {bookingsError}
+                    </p>
+                  )}
+
+                  {!loadingBookings &&
+                    !bookingsError &&
+                    bookings.map((booking) => (
+                      <div
+                        key={booking.id}
+                        className="bg-card border border-border rounded-lg p-6"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h3 className="text-lg font-bold text-foreground">
+                              {booking.propertyName}
+                            </h3>
+                            <p className="text-muted-foreground text-sm">
+                              {t("dashboard.bookingId")} : #{booking.id}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span
+                              className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                                booking.status === "confirmed"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-yellow-100 text-yellow-700"
+                              }`}
+                            >
+                              {t(`dashboard.${booking.status}`)}
+                            </span>
+                            <p className="text-2xl font-bold text-primary mt-2">
+                              {formatCurrency(booking.total, language)}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span
-                            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                              booking.status === "confirmed"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-yellow-100 text-yellow-700"
-                            }`}
-                          >
-                            {t(`dashboard.${booking.status}`)}
+
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4 pb-4 border-b border-border">
+                          <span>
+                            {t("dashboard.checkIn")}: {booking.checkIn}
                           </span>
-                          <p className="text-2xl font-bold text-primary mt-2">
-                            {formatCurrency(booking.total, language)}
-                          </p>
+                          <span>
+                            {t("dashboard.checkOut")}: {booking.checkOut}
+                          </span>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-6 text-sm text-muted-foreground mb-4 pb-4 border-b border-border">
-                        <span>{t("dashboard.checkIn")}: {booking.checkIn}</span>
-                        <span>{t("dashboard.checkOut")}: {booking.checkOut}</span>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Link
-                          to={`/booking/${booking.id}`}
-                          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold"
-                        >
-                          {t("common.viewDetails")}
-                        </Link>
-                        {booking.status === "confirmed" && (
-                            <button className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-sm font-semibold">
+                        <div className="flex gap-3">
+                          <Link
+                            to={`/booking/${booking.id}`}
+                            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold"
+                          >
+                            {t("common.viewDetails")}
+                          </Link>
+                          {canCancelBooking(booking.status) && (
+                            <button
+                              onClick={() => handleCancelClick(booking)}
+                              className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/10 transition-colors text-sm font-semibold"
+                            >
                               {t("dashboard.cancelBooking")}
                             </button>
                           )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
 
-                {bookings.length === 0 && (
+                {!loadingBookings && !bookingsError && bookings.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-muted-foreground mb-4">
                       {t("dashboard.noBookings")}
@@ -173,6 +301,41 @@ export default function Dashboard() {
                     </Link>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Cancel booking confirmation modal */}
+            {cancellingBooking && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-xl">
+                  <h3 className="text-lg font-bold text-foreground mb-3">
+                    {t("dashboard.cancelConfirmTitle")}
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    {t("dashboard.cancelConfirmMessage")}
+                  </p>
+                  <p className="text-sm text-foreground mb-4">
+                    {cancellingBooking.propertyName} · {cancellingBooking.checkIn} → {cancellingBooking.checkOut}
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setCancellingBooking(null)}
+                      disabled={cancelLoading}
+                      className="btn-secondary"
+                    >
+                      {t("common.back")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelConfirm}
+                      disabled={cancelLoading}
+                      className="px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50 font-semibold"
+                    >
+                      {cancelLoading ? t("dashboard.cancelling") : t("dashboard.confirmCancel")}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -190,7 +353,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
-                        defaultValue={user.name}
+                        defaultValue={userName}
                         className="flex-1 px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                       />
                       <button className="p-2 hover:bg-muted rounded transition-colors">
@@ -205,7 +368,7 @@ export default function Dashboard() {
                     </label>
                     <input
                       type="email"
-                      defaultValue={user.email}
+                      defaultValue={auth?.user.email}
                       disabled
                       className="w-full px-4 py-2 border border-border rounded-lg bg-muted text-foreground"
                     />
@@ -217,7 +380,7 @@ export default function Dashboard() {
                     </label>
                     <input
                       type="tel"
-                      defaultValue={user.phone}
+                      defaultValue=""
                       className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
                     />
                   </div>

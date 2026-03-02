@@ -1,11 +1,12 @@
 import Layout from "@/components/Layout";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, User } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Register() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -14,6 +15,7 @@ export default function Register() {
     confirmPassword: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -24,16 +26,45 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (formData.password !== formData.confirmPassword) {
-      alert(t("auth.passwordMismatch"));
+      setError(t("auth.passwordMismatch"));
       return;
     }
+
     setIsLoading(true);
-    // Mock registration
-    setTimeout(() => {
+    try {
+      console.log("🔍 [AUTH] Registering user...", { email: formData.email });
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          password: formData.password,
+        }),
+      });
+
+      const json = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        console.error("❌ [AUTH] Registration failed:", json);
+        setError(json.error || "Unable to create account. Please try again.");
+        return;
+      }
+
+      console.log("✅ [AUTH] Registration successful, redirecting to login");
+      navigate("/login");
+    } catch (err) {
+      console.error("❌ [AUTH] Network error during registration", err);
+      setError("Network error. Please try again.");
+    } finally {
       setIsLoading(false);
-      alert("Account created! Please check your email to verify.");
-    }, 1500);
+    }
   };
 
   return (
@@ -175,6 +206,12 @@ export default function Register() {
               {isLoading ? t("auth.creatingAccount") : t("auth.createButton")}
             </button>
           </form>
+
+          {error && (
+            <p className="mt-4 text-sm text-destructive text-center">
+              {error}
+            </p>
+          )}
 
           {/* Sign In Link */}
           <p className="text-center text-sm text-muted-foreground mt-6">

@@ -5,57 +5,34 @@ import {
   Users,
   MapPin,
   Search,
-  Star,
   Wifi,
   Utensils,
   Waves,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+
+type PropertySummary = {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  city: string;
+  country: string;
+  mainImage: string;
+  unitsCount: number;
+  startingFrom: number | null;
+};
 
 export default function Index() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("2");
+  const [featuredProperties, setFeaturedProperties] = useState<PropertySummary[]>([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(true);
+  const [propertiesError, setPropertiesError] = useState<string | null>(null);
   const { language, t } = useLanguage();
-
-  // Featured properties data
-  const featuredProperties = [
-    {
-      id: 1,
-      name: "The Lykoskufi Villas",
-      descriptionKey: "home.featured.prop1",
-      units: 3,
-      image:
-        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop",
-      price: 250,
-      rating: 4.8,
-      reviews: 124,
-    },
-    {
-      id: 2,
-      name: "The Ogra House",
-      descriptionKey: "home.featured.prop2",
-      units: 1,
-      image:
-        "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop",
-      price: 180,
-      rating: 4.9,
-      reviews: 87,
-    },
-    {
-      id: 3,
-      name: "The Bungalows",
-      descriptionKey: "home.featured.prop3",
-      units: 2,
-      image:
-        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop",
-      price: 150,
-      rating: 4.7,
-      reviews: 102,
-    },
-  ];
 
   const amenities = [
     {
@@ -89,6 +66,31 @@ export default function Index() {
     if (guests) params.set("guests", guests);
     window.location.href = `/properties?${params.toString()}`;
   };
+
+  useEffect(() => {
+    const loadProperties = async () => {
+      try {
+        console.log("🔍 [CLIENT] Fetching featured properties...");
+        const response = await fetch("/api/properties");
+
+        if (!response.ok) {
+          throw new Error(`Failed to load properties: ${response.status}`);
+        }
+
+        const json = await response.json();
+        const items = (json.data ?? []) as PropertySummary[];
+
+        setFeaturedProperties(items.slice(0, 6));
+      } catch (error) {
+        console.error("❌ [CLIENT] Error loading properties", error);
+        setPropertiesError("Unable to load properties right now.");
+      } finally {
+        setPropertiesLoading(false);
+      }
+    };
+
+    loadProperties();
+  }, []);
 
   return (
     <Layout>
@@ -198,69 +200,60 @@ export default function Index() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {featuredProperties.map((property) => (
-            <Link
-              key={property.id}
-              to={`/properties/${property.id}`}
-              className="card-hover overflow-hidden group"
-            >
-              {/* Image */}
-              <div className="relative h-64 overflow-hidden bg-muted">
-                <img
-                  src={property.image}
-                  alt={property.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                />
+        {propertiesLoading ? (
+          <p className="text-muted-foreground">Loading properties...</p>
+        ) : propertiesError ? (
+          <p className="text-destructive text-sm">{propertiesError}</p>
+        ) : featuredProperties.length === 0 ? (
+          <p className="text-muted-foreground">No properties available yet.</p>
+        ) : (
+          <>
+            <div className="grid md:grid-cols-3 gap-6">
+              {featuredProperties.map((property) => (
+                <Link
+                  key={property.id}
+                  to={`/properties/${property.id}`}
+                  className="card-hover overflow-hidden group"
+                >
+                  {/* Image */}
+                  <div className="relative h-64 overflow-hidden bg-muted">
+                    <img
+                      src={property.mainImage || `https://images.unsplash.com/photo-1566073775-4b56bc6404798012d8f0b?ixlib=rb-4.0.3&ixid=MnwxhbT2Zj6q7&auto=format&fit=crop&w=800&q=80`}
+                      alt={property.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                    {property.startingFrom !== null && (
                       <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
                         <span className="text-primary font-bold">
-                          {formatCurrency(property.price, language)}
+                          {formatCurrency(property.startingFrom, language)}
                         </span>
-                        <span className="text-muted-foreground text-sm">/night</span>
+                        <span className="text-muted-foreground text-sm">
+                          /night
+                        </span>
                       </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-foreground mb-2">
-                  {property.name}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {t(property.descriptionKey)}
-                </p>
-
-                {/* Rating */}
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex gap-0.5">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={16}
-                        className={
-                          i < 5 ? "fill-accent text-accent" : "text-border"
-                        }
-                      />
-                    ))}
+                    )}
                   </div>
-                  <span className="font-semibold text-foreground">
-                    {property.rating}
-                  </span>
-                </div>
 
-                {/* Units */}
-                <div className="text-sm text-muted-foreground">
-                  {property.units} {t("common.unitsAvailable")}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+                  {/* Content */}
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-foreground mb-2">
+                      {property.name}
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      {property.location || `${property.city}, ${property.country}`}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
 
-        <div className="mt-12 text-center">
-          <Link to="/properties" className="btn-primary">
-            {t("home.featured.viewAll")}
-          </Link>
-        </div>
+            <div className="mt-12 text-center">
+              <Link to="/properties" className="btn-primary">
+                {t("home.featured.viewAll")}
+              </Link>
+            </div>
+          </>
+        )}
       </section>
 
       {/* Why Book With Us */}

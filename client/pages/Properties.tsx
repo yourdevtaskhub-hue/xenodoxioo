@@ -1,112 +1,40 @@
 import Layout from "@/components/Layout";
 import { Link, useSearchParams } from "react-router-dom";
-import { Star, MapPin, Users, Bed, Bath, Wifi } from "lucide-react";
-import { useState } from "react";
+import { MapPin, Users, Bed, Bath } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
+
+type UnitWithProperty = {
+  id: string;
+  propertyId: string;
+  name: string;
+  description?: string | null;
+  bedrooms: number;
+  bathrooms: number;
+  maxGuests: number;
+  basePrice: number;
+  images: string[];
+  property: {
+    id: string;
+    name: string;
+    city: string;
+    country: string;
+    location: string;
+  } | null;
+};
 
 export default function Properties() {
   const [searchParams] = useSearchParams();
   const [priceFilter, setPriceFilter] = useState("all");
   const [bedroomFilter, setBedroomFilter] = useState("all");
+  const [units, setUnits] = useState<UnitWithProperty[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(true);
+  const [unitsError, setUnitsError] = useState<string | null>(null);
   const { language, t } = useLanguage();
 
-  // All properties with units data
-  const allProperties = [
-    {
-      id: 1,
-      name: "The Lykoskufi Villas - Villa A",
-      property: "The Lykoskufi Villas",
-      descriptionKey: "properties.sample1",
-      bedrooms: 3,
-      bathrooms: 2,
-      maxGuests: 6,
-      price: 280,
-      image:
-        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop",
-      rating: 4.9,
-      reviews: 56,
-      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.privatePool"],
-    },
-    {
-      id: 2,
-      name: "The Lykoskufi Villas - Villa B",
-      property: "The Lykoskufi Villas",
-      descriptionKey: "properties.sample2",
-      bedrooms: 4,
-      bathrooms: 3,
-      maxGuests: 8,
-      price: 320,
-      image:
-        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop",
-      rating: 4.8,
-      reviews: 42,
-      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.privatePool"],
-    },
-    {
-      id: 3,
-      name: "The Lykoskufi Villas - Villa C",
-      property: "The Lykoskufi Villas",
-      descriptionKey: "properties.sample3",
-      bedrooms: 3,
-      bathrooms: 2,
-      maxGuests: 6,
-      price: 250,
-      image:
-        "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop",
-      rating: 4.7,
-      reviews: 38,
-      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.balcony"],
-    },
-    {
-      id: 4,
-      name: "The Ogra House",
-      property: "The Ogra House",
-      descriptionKey: "properties.sample4",
-      bedrooms: 4,
-      bathrooms: 2,
-      maxGuests: 8,
-      price: 220,
-      image:
-        "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=600&h=400&fit=crop",
-      rating: 4.9,
-      reviews: 67,
-      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.beachAccess"],
-    },
-    {
-      id: 5,
-      name: "The Bungalows - Unit 1",
-      property: "The Bungalows",
-      descriptionKey: "properties.sample5",
-      bedrooms: 2,
-      bathrooms: 1,
-      maxGuests: 4,
-      price: 140,
-      image:
-        "https://images.unsplash.com/photo-1512207736139-e54660a749a0?w=600&h=400&fit=crop",
-      rating: 4.6,
-      reviews: 44,
-      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.patio"],
-    },
-    {
-      id: 6,
-      name: "The Bungalows - Unit 2",
-      property: "The Bungalows",
-      descriptionKey: "properties.sample6",
-      bedrooms: 2,
-      bathrooms: 1,
-      maxGuests: 4,
-      price: 160,
-      image:
-        "https://images.unsplash.com/photo-1464207687429-7505649dae38?w=600&h=400&fit=crop",
-      rating: 4.7,
-      reviews: 51,
-      amenities: ["amenities.fastWifi", "amenities.ac", "amenities.fullKitchen", "amenities.garden"],
-    },
-  ];
-
   // Apply filters
-  let filtered = allProperties;
+  let filtered = units;
 
   const checkIn = searchParams.get("checkIn");
   const checkOut = searchParams.get("checkOut");
@@ -115,7 +43,7 @@ export default function Properties() {
   if (priceFilter !== "all") {
     const [min, max] = priceFilter.split("-").map(Number);
     filtered = filtered.filter(
-      (p) => p.price >= min && (!max || p.price <= max),
+      (p) => p.basePrice >= min && (!max || p.basePrice <= max),
     );
   }
 
@@ -127,6 +55,52 @@ export default function Properties() {
     const guestCount = parseInt(guests);
     filtered = filtered.filter((p) => p.maxGuests >= guestCount);
   }
+
+  useEffect(() => {
+    const loadUnits = async () => {
+      try {
+        console.log("🔍 [CLIENT] Fetching units for properties page...");
+        const response = await fetch("/api/units");
+
+        if (!response.ok) {
+          throw new Error(`Failed to load units: ${response.status}`);
+        }
+
+        const json = await response.json();
+        const data = (json.data ?? []) as any[];
+
+        const mapped: UnitWithProperty[] = data.map((u) => ({
+          id: u.id,
+          propertyId: u.propertyId,
+          name: u.name,
+          description: u.description,
+          bedrooms: u.bedrooms,
+          bathrooms: u.bathrooms,
+          maxGuests: u.maxGuests,
+          basePrice: u.basePrice,
+          images: Array.isArray(u.images) ? u.images : [],
+          property: u.property
+            ? {
+                id: u.property.id,
+                name: u.property.name,
+                city: u.property.city,
+                country: u.property.country,
+                location: u.property.location,
+              }
+            : null,
+        }));
+
+        setUnits(mapped);
+      } catch (error) {
+        console.error("❌ [CLIENT] Error loading units", error);
+        setUnitsError("Unable to load properties right now.");
+      } finally {
+        setLoadingUnits(false);
+      }
+    };
+
+    loadUnits();
+  }, []);
 
   return (
     <Layout>
@@ -233,7 +207,17 @@ export default function Properties() {
 
           {/* Properties Grid */}
           <div className="lg:col-span-3">
-            {filtered.length === 0 ? (
+            {loadingUnits ? (
+              <div className="text-center py-16">
+                <p className="text-lg text-muted-foreground">
+                  Loading properties...
+                </p>
+              </div>
+            ) : unitsError ? (
+              <div className="text-center py-16">
+                <p className="text-destructive text-sm mb-4">{unitsError}</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <p className="text-lg text-muted-foreground mb-4">
                   {t("properties.noResults")}
@@ -250,18 +234,21 @@ export default function Properties() {
               </div>
             ) : (
               <div className="space-y-6">
-                {filtered.map((property) => (
+                {filtered.map((unit) => (
                   <Link
-                    key={property.id}
-                    to={`/properties/${property.id}`}
+                    key={unit.id}
+                    to={`/properties/${unit.property?.id ?? unit.propertyId}`}
                     className="grid md:grid-cols-3 gap-6 card-hover p-4 md:p-6"
                   >
                     {/* Image */}
                     <div className="md:col-span-1">
                       <div className="relative h-64 md:h-full rounded-lg overflow-hidden bg-muted group">
                         <img
-                          src={property.image}
-                          alt={property.name}
+                          src={
+                            unit.images[0] ||
+                            undefined
+                          }
+                          alt={unit.name}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                         />
                       </div>
@@ -272,16 +259,25 @@ export default function Properties() {
                       <div>
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <p className="text-sm text-muted-foreground">
-                              {property.property}
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              {unit.property?.name}
+                              {unit.property && (
+                                <>
+                                  {" · "}
+                                  <MapPin size={14} className="text-primary" />
+                                  <span>
+                                    {unit.property.city}, {unit.property.country}
+                                  </span>
+                                </>
+                              )}
                             </p>
                             <h3 className="text-xl font-bold text-foreground">
-                              {property.name}
+                              {unit.name}
                             </h3>
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-primary">
-                              {formatCurrency(property.price, language)}
+                              {formatCurrency(unit.basePrice, language)}
                             </div>
                             <p className="text-muted-foreground text-sm">
                               per night
@@ -289,54 +285,39 @@ export default function Properties() {
                           </div>
                         </div>
 
-                            <p className="text-muted-foreground mb-4">
-                              {t(property.descriptionKey)}
-                        </p>
+                        {unit.description && (
+                          <p className="text-muted-foreground mb-4">
+                            {unit.description}
+                          </p>
+                        )}
 
                         {/* Details */}
                         <div className="flex flex-wrap gap-4 mb-4 text-sm">
                           <div className="flex items-center gap-2 text-foreground">
                             <Bed size={16} className="text-primary" />
-                            {property.bedrooms} {property.bedrooms === 1 ? t("common.bedroom") : t("common.bedrooms")}
+                            {unit.bedrooms}{" "}
+                            {unit.bedrooms === 1
+                              ? t("common.bedroom")
+                              : t("common.bedrooms")}
                           </div>
                           <div className="flex items-center gap-2 text-foreground">
                             <Bath size={16} className="text-primary" />
-                            {property.bathrooms} {property.bathrooms === 1 ? t("common.bathroom") : t("common.bathrooms")}
+                            {unit.bathrooms}{" "}
+                            {unit.bathrooms === 1
+                              ? t("common.bathroom")
+                              : t("common.bathrooms")}
                           </div>
                           <div className="flex items-center gap-2 text-foreground">
                             <Users size={16} className="text-primary" />
-                            {property.maxGuests} {t("common.guests")}
+                            {unit.maxGuests} {t("common.guests")}
                           </div>
-                        </div>
-
-                        {/* Amenities */}
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {property.amenities.slice(0, 3).map((amenity, i) => (
-                            <span
-                              key={i}
-                              className="px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full"
-                            >
-                              {t(amenity)}
-                            </span>
-                          ))}
                         </div>
                       </div>
 
-                      {/* Rating & CTA */}
+                      {/* CTA */}
                       <div className="flex items-center justify-between pt-4 border-t border-border">
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-0.5">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                size={14}
-                                className="fill-accent text-accent"
-                              />
-                            ))}
-                          </div>
-                          <span className="font-semibold text-foreground">
-                            {property.rating}
-                          </span>
+                        <div className="text-sm text-muted-foreground">
+                          {t("properties.available")}
                         </div>
                         <button className="btn-primary">View Details</button>
                       </div>

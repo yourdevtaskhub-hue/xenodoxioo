@@ -26,6 +26,14 @@ model User {
   lastLoginAt          DateTime?
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  sessions              Session[]
+  passwordResets        PasswordReset[]
+  bookings              Booking[]
+  payments              Payment[]
+  reviews               Review[]
+  adminLogs             AdminLog[]
 }
 
 // ==================== SESSIONS ====================
@@ -36,6 +44,9 @@ model Session {
   refreshToken           String     @unique
   expiresAt             DateTime
   createdAt             DateTime   @default(now())
+  
+  // Relations
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ==================== PASSWORD RESETS ====================
@@ -45,6 +56,9 @@ model PasswordReset {
   token                 String     @unique
   expiresAt             DateTime
   createdAt             DateTime   @default(now())
+  
+  // Relations
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ==================== PROPERTIES ====================
@@ -61,6 +75,12 @@ model Property {
   isActive              Boolean    @default(true)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  units                 Unit[]
+  amenities             Amenity[]
+  dateBlockages         DateBlockage[]
+  seasonalPricing       SeasonalPricing[]
 }
 
 // ==================== UNITS ====================
@@ -81,6 +101,10 @@ model Unit {
   isActive              Boolean    @default(true)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  bookings              Booking[]
 }
 
 // ==================== BOOKINGS ====================
@@ -88,7 +112,7 @@ model Booking {
   id                    String     @id @default(cuid())
   bookingNumber         String     @unique
   unitId                String
-  userId                String
+  userId                String?    // null = guest checkout
   checkInDate           DateTime
   checkOutDate          DateTime
   nights                Int
@@ -116,6 +140,12 @@ model Booking {
   cancelledAt           DateTime?
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  unit                  Unit       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  user                  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payments              Payment[]
+  reviews               Review[]
 }
 
 // ==================== PAYMENTS ====================
@@ -139,6 +169,10 @@ model Payment {
   refundAmount         Float     @default(0)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  booking               Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ==================== REVIEWS ====================
@@ -150,4 +184,82 @@ model Review {
   comment               String?
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  booking               Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==================== ADMIN LOGS ====================
+model AdminLog {
+  id                    String     @id @default(cuid())
+  adminId               String
+  action                String
+  entityType            String
+  entityId              String?
+  description           String?
+  changes               String?
+  createdAt             DateTime   @default(now())
+  
+  // Relations
+  admin                 User       @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+// ==================== DATE BLOCKAGES ====================
+model DateBlockage {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  startDate             DateTime
+  endDate               DateTime
+  reason                String?
+  createdAt             DateTime   @default(now())
+  
+  // Relations
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+// ==================== SEASONAL PRICING ====================
+model SeasonalPricing {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  name                  String
+  startDate             DateTime
+  endDate               DateTime
+  pricePerNight         Float
+  minStayDays           Int        @default(1)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  
+  // Relations
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+// ==================== COUPONS ====================
+model Coupon {
+  id                    String     @id @default(cuid())
+  code                  String     @unique
+  description           String?
+  discountType          String     // PERCENTAGE or FIXED
+  discountValue         Float
+  validFrom             DateTime
+  validUntil            DateTime
+  minBookingAmount      Float?
+  maxUses               Int?
+  usedCount             Int        @default(0)
+  isActive              Boolean    @default(true)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+// ==================== AMENITIES ====================
+model Amenity {
+  id                    String     @id @default(cuid())
+  propertyId            String
+  name                  String
+  description           String?
+  icon                  String?
+  createdAt             DateTime   @default(now())
+  
+  // Relations
+  property              Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }

@@ -6,6 +6,7 @@ import {
   AppError,
 } from "../lib/errors";
 import { nanoid } from "nanoid";
+import * as adminService from "./admin.service";
 
 /**
  * Check if dates are available for a unit
@@ -37,13 +38,11 @@ export async function checkAvailability(
     return { isAvailable: false, reason: "Property not found" };
   }
 
-  // Check for overlapping bookings
+  // Check for overlapping bookings (any non-cancelled booking reserves the dates)
   const conflictingBookings = await prisma.booking.findMany({
     where: {
       unitId,
-      status: {
-        in: ["CONFIRMED", "DEPOSIT_PAID", "CHECKED_IN"],
-      },
+      status: { not: "CANCELLED" },
       OR: [
         {
           checkInDate: { lt: checkOutDate },
@@ -81,6 +80,21 @@ export async function checkAvailability(
   }
 
   return { isAvailable: true };
+}
+
+/** Get occupied date ranges for a unit (non-cancelled bookings) for calendar display */
+export async function getOccupiedDateRanges(unitId: string): Promise<{ start: string; end: string }[]> {
+  const bookings = await prisma.booking.findMany({
+    where: {
+      unitId,
+      status: { not: "CANCELLED" },
+    },
+    select: { checkInDate: true, checkOutDate: true },
+  });
+  return bookings.map((b) => ({
+    start: b.checkInDate.toISOString().slice(0, 10),
+    end: b.checkOutDate.toISOString().slice(0, 10),
+  }));
 }
 
 /**
@@ -126,19 +140,7 @@ export async function calculatePrice(
   const subtotal = basePrice * nights;
   const cleaningFee = unit.cleaningFee || 0;
 
-  // Apply long stay discount
   let discountAmount = 0;
-  const longStayDiscount = await prisma.longStayDiscount.findFirst({
-    where: {
-      minNights: { lte: nights },
-      isActive: true,
-    },
-    orderBy: { minNights: "desc" },
-  });
-
-  if (longStayDiscount) {
-    discountAmount = (subtotal * longStayDiscount.discountPercentage) / 100;
-  }
 
   // Apply coupon discount if provided
   let couponDiscount = 0;
@@ -152,7 +154,8 @@ export async function calculatePrice(
       coupon.isActive &&
       new Date() >= coupon.validFrom &&
       new Date() <= coupon.validUntil &&
-      (!coupon.maxUses || coupon.usedCount < coupon.maxUses)
+      (!coupon.maxUses || coupon.usedCount < coupon.maxUses) &&
+      (coupon.minBookingAmount == null || subtotal >= coupon.minBookingAmount)
     ) {
       if (coupon.discountType === "PERCENTAGE") {
         couponDiscount =
@@ -165,9 +168,18 @@ export async function calculatePrice(
 
   discountAmount += couponDiscount;
 
-  // Calculate taxes (15%)
+  // Get tax settings
+  let taxRate = 0.15; // default
+  try {
+    const taxSettings = await adminService.getTaxSettings();
+    taxRate = taxSettings.taxRate / 100;
+  } catch (error) {
+    console.error("Failed to fetch tax settings, using default:", error);
+  }
+
+  // Calculate taxes using dynamic rate
   const taxableAmount = subtotal - discountAmount + cleaningFee;
-  const taxes = Math.round(taxableAmount * 0.15 * 100) / 100;
+  const taxes = Math.round(taxableAmount * taxRate * 100) / 100;
 
   const totalPrice = subtotal + cleaningFee + taxes - discountAmount;
   const depositAmount = Math.round(totalPrice * 0.25 * 100) / 100;
@@ -187,11 +199,11 @@ export async function calculatePrice(
 }
 
 /**
- * Create a new booking
+ * Create a new booking (userId optional = guest checkout)
  */
 export async function createBooking(
   unitId: string,
-  userId: string,
+  userId: string | null | undefined,
   checkInDate: Date,
   checkOutDate: Date,
   guests: number,
@@ -201,8 +213,8 @@ export async function createBooking(
   specialRequests?: string,
   couponCode?: string,
 ) {
-  // Validate input
-  if (!unitId || !userId || !guestName || !guestEmail || guests < 1) {
+  // Validate input (userId not required for guest checkout)
+  if (!unitId || !guestName || !guestEmail || guests < 1) {
     throw new ValidationError("Missing required booking fields");
   }
 
@@ -248,7 +260,7 @@ export async function createBooking(
     data: {
       bookingNumber,
       unitId,
-      userId,
+      userId: userId ?? undefined,
       checkInDate,
       checkOutDate,
       nights: pricing.nights,
@@ -263,7 +275,6 @@ export async function createBooking(
       guestName,
       guestEmail,
       guestPhone,
-      specialRequests,
       status: "PENDING",
     },
   });
@@ -286,9 +297,12 @@ export async function createBooking(
 }
 
 /**
- * Get booking by ID
+ * Get booking by ID. Access: owner by userId, or guest by guestEmail when booking has no userId.
  */
-export async function getBookingById(bookingId: string, userId?: string) {
+export async function getBookingById(
+  bookingId: string,
+  opts?: { userId?: string; guestEmail?: string },
+) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -301,12 +315,22 @@ export async function getBookingById(bookingId: string, userId?: string) {
     throw new NotFoundError("Booking not found");
   }
 
-  // Check access if userId provided
-  if (userId && booking.userId !== userId) {
-    throw new AppError(403, "You do not have access to this booking");
+  if (opts?.userId) {
+    if (booking.userId !== opts.userId) {
+      throw new AppError(403, "You do not have access to this booking");
+    }
+    return booking;
   }
-
-  return booking;
+  if (opts?.guestEmail && !booking.userId) {
+    if (booking.guestEmail.toLowerCase() !== opts.guestEmail.toLowerCase()) {
+      throw new AppError(403, "You do not have access to this booking");
+    }
+    return booking;
+  }
+  if (!opts?.userId && !opts?.guestEmail) {
+    throw new AppError(401, "Authentication or guest email required");
+  }
+  throw new AppError(403, "You do not have access to this booking");
 }
 
 /**
@@ -343,14 +367,14 @@ export async function getUserBookings(
 }
 
 /**
- * Cancel booking
+ * Cancel booking (owner by userId or guest by guestEmail when booking has no userId).
  */
 export async function cancelBooking(
   bookingId: string,
-  userId: string,
+  opts: { userId?: string; guestEmail?: string },
   reason?: string,
 ) {
-  const booking = await getBookingById(bookingId, userId);
+  const booking = await getBookingById(bookingId, opts);
 
   if (!["PENDING", "DEPOSIT_PAID", "CONFIRMED"].includes(booking.status)) {
     throw new ConflictError("This booking cannot be cancelled");
