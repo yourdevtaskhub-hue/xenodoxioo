@@ -11,6 +11,7 @@ import { authRouter } from "./routes/auth";
 import { bookingRouter } from "./routes/bookings";
 import { propertiesRouter } from "./routes/properties";
 import { unitsRouter } from "./routes/units";
+import viewVideosRouter from "./routes/viewvideos";
 import PaymentScheduler from "./services/scheduler";
 
 export function createServer() {
@@ -33,22 +34,20 @@ export function createServer() {
     }
   });
 
-  const upload = multer({ 
-    storage: storage,
-    limits: {
-      fileSize: 10 * 1024 * 1024 // 10MB limit
+  const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req: express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+      if (file.mimetype.startsWith('image/')) cb(null, true);
+      else cb(new Error('Only image files are allowed'));
     },
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Only image files are allowed'));
-      }
-    }
   });
 
-  // Make upload middleware available to routes
+  // Accepts both mainImage and images - fixes "Unexpected field" when form has mixed fields
+  const uploadFields = upload.fields([{ name: 'mainImage', maxCount: 1 }, { name: 'images', maxCount: 20 }]);
+
   app.locals.upload = upload;
+  app.locals.uploadFields = uploadFields;
 
   // Middleware
   app.use(cors());
@@ -57,6 +56,9 @@ export function createServer() {
   
   // Serve uploaded files
   app.use('/uploads', express.static(uploadsDir));
+
+  // Serve view videos from public/viewvideos via API (guaranteed correct path)
+  app.use("/api/viewvideos", viewVideosRouter);
 
   // Health check
   app.get("/api/ping", (_req, res) => {

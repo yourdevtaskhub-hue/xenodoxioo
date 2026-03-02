@@ -32,6 +32,9 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
+      framer-motion:
+        specifier: ^12.23.12
+        version: 12.23.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
@@ -195,9 +198,6 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@18.3.1)
-      framer-motion:
-        specifier: ^12.23.12
-        version: 12.23.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       globals:
         specifier: ^16.3.0
         version: 16.3.0
