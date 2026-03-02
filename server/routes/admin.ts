@@ -334,15 +334,15 @@ router.get("/properties", async (req, res, next) => {
 
 // Create Property with file upload
 router.post("/properties", (req, res, next) => {
-    const uploadFields = req.app.locals.uploadFields;
+    const uploadAny = req.app.locals.uploadAny;
     
-    uploadFields(req, res, async (err) => {
+    uploadAny(req, res, async (err) => {
         if (err) return next(err);
         
         try {
             const { name, description, location, city, country, galleryImages } = req.body;
-            const files = req.files as { mainImage?: Express.Multer.File[], images?: Express.Multer.File[] };
-            const mainFile = files?.mainImage?.[0];
+            const allFiles = (req.files as Express.Multer.File[]) || [];
+            const mainFile = allFiles.find((f) => f.fieldname === 'mainImage');
             
             const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
             
@@ -387,13 +387,13 @@ router.get("/units", async (req, res, next) => {
 
 // Create Unit (with optional multiple image uploads)
 router.post("/units", (req, res, next) => {
-    const uploadFields = req.app.locals.uploadFields;
-    uploadFields(req, res, async (err) => {
+    const uploadAny = req.app.locals.uploadAny;
+    uploadAny(req, res, async (err) => {
         if (err) return next(err);
         try {
             const { propertyId, name, description, maxGuests, bedrooms, bathrooms, beds, basePrice, cleaningFee, minStayDays } = req.body;
-            const files = req.files as { mainImage?: Express.Multer.File[], images?: Express.Multer.File[] };
-            const imageFiles = files?.images || [];
+            const allFiles = (req.files as Express.Multer.File[]) || [];
+            const imageFiles = allFiles.filter((f) => f.fieldname === 'images');
             const imagePaths = imageFiles.map(
                 (f) => `/uploads/${f.filename}`
             );
@@ -423,15 +423,15 @@ router.post("/units", (req, res, next) => {
 
 // Update Unit
 router.put("/units/:id", (req, res, next) => {
-    const uploadFields = req.app.locals.uploadFields;
-    uploadFields(req, res, async (err) => {
+    const uploadAny = req.app.locals.uploadAny;
+    uploadAny(req, res, async (err) => {
         if (err) return next(err);
         try {
             const id = req.params.id;
             const { propertyId, name, description, maxGuests, bedrooms, bathrooms, beds, basePrice, cleaningFee, minStayDays, existingImages } = req.body;
             const existing = existingImages ? (typeof existingImages === "string" ? JSON.parse(existingImages) : existingImages) : [];
-            const files = req.files as { mainImage?: Express.Multer.File[], images?: Express.Multer.File[] };
-            const imageFiles = files?.images || [];
+            const allFiles = (req.files as Express.Multer.File[]) || [];
+            const imageFiles = allFiles.filter((f) => f.fieldname === 'images');
             const newPaths = imageFiles.map(
                 (f) => `/uploads/${f.filename}`
             );
@@ -472,14 +472,14 @@ router.delete("/units/:id", async (req, res, next) => {
 
 // Update Property
 router.put("/properties/:id", (req, res, next) => {
-    const uploadFields = req.app.locals.uploadFields;
-    uploadFields(req, res, async (err) => {
+    const uploadAny = req.app.locals.uploadAny;
+    uploadAny(req, res, async (err) => {
         if (err) return next(err);
         try {
             const id = req.params.id;
             const { name, description, location, city, country } = req.body;
-            const files = req.files as { mainImage?: Express.Multer.File[], images?: Express.Multer.File[] };
-            const mainFile = files?.mainImage?.[0];
+            const allFiles = (req.files as Express.Multer.File[]) || [];
+            const mainFile = allFiles.find((f) => f.fieldname === 'mainImage');
             const updateData: Record<string, unknown> = {};
             if (name) {
                 updateData.name = name;

@@ -43,11 +43,11 @@ export function createServer() {
     },
   });
 
-  // Accepts both mainImage and images - fixes "Unexpected field" when form has mixed fields
-  const uploadFields = upload.fields([{ name: 'mainImage', maxCount: 1 }, { name: 'images', maxCount: 20 }]);
+  // Accept any file field - fixes "Unexpected field" (client may send various field names)
+  const uploadAny = upload.any();
 
   app.locals.upload = upload;
-  app.locals.uploadFields = uploadFields;
+  app.locals.uploadAny = uploadAny;
 
   // Middleware
   app.use(cors());

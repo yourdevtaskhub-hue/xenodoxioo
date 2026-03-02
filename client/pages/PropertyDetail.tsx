@@ -56,6 +56,7 @@ type ApiPropertyDetail = {
 };
 
 // Map property/unit names to view video filenames (in public/viewvideos)
+// Returns encoded URL for spaces and special chars (Greek etc.)
 function getViewVideoPath(propertyName: string, unitName: string): string | null {
   const normalized = (s: string) =>
     s
@@ -65,28 +66,30 @@ function getViewVideoPath(propertyName: string, unitName: string): string | null
   const p = normalized(propertyName);
   const u = normalized(unitName);
 
-  if (p.includes("ogra") || u.includes("ogra")) return "/viewvideos/Ogra House.mp4";
-  if (p.includes("small") || u.includes("small bungalow"))
-    return "/viewvideos/Small bungalow.mp4";
-  if (
+  let raw: string | null = null;
+  if (p.includes("ogra") || u.includes("ogra")) raw = "/api/viewvideos/Ogra House.mp4";
+  else if (p.includes("small") || u.includes("small bungalow"))
+    raw = "/api/viewvideos/Small bungalow.mp4";
+  else if (
     p.includes("μεγάλο") ||
     p.includes("megalo") ||
     p.includes("big bungalow") ||
     u.includes("big") ||
     u.includes("μεγάλο")
   )
-    return "/viewvideos/Μεγάλο bungalow.mp4";
-  if (p.includes("lykoskufi 5") || u.includes("lykoskufi 5"))
-    return "/viewvideos/Lykoskufi 5.mp4";
-  if (
+    raw = "/api/viewvideos/Μεγάλο bungalow.mp4";
+  else if (p.includes("lykoskufi 5") || u.includes("lykoskufi 5"))
+    raw = "/api/viewvideos/Lykoskufi 5.mp4";
+  else if (
     p.includes("lykoskufi 2") ||
     p.includes("lykoskufi2") ||
     u.includes("lykoskufi 2") ||
     u.includes("lykoskufi2")
   )
-    return "/viewvideos/Lykoskufi2.mp4";
-  if (p.includes("lykoskufi")) return "/viewvideos/Lykoskufi2.mp4"; // fallback for Lykoskufi 1 etc.
-  return null;
+    raw = "/api/viewvideos/Lykoskufi2.mp4";
+  else if (p.includes("lykoskufi")) raw = "/api/viewvideos/Lykoskufi2.mp4";
+
+  return raw ? raw.replace(/[^/]+$/, (filename) => encodeURIComponent(filename)) : null;
 }
 
 export default function PropertyDetail() {
@@ -102,6 +105,7 @@ export default function PropertyDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const thumbScrollRef = useRef<HTMLDivElement>(null);
   const [videoHovered, setVideoHovered] = useState(false);
   const [videoStarted, setVideoStarted] = useState(false);
   const { language, t } = useLanguage();
@@ -169,6 +173,14 @@ export default function PropertyDetail() {
         ? [data.property.mainImage]
         : [];
 
+  // Scroll selected thumbnail into view when changing image
+  useEffect(() => {
+    const el = thumbScrollRef.current;
+    if (!el || images.length <= 1) return;
+    const thumb = el.querySelector(`[data-thumb-index="${selectedImage}"]`);
+    thumb?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [selectedImage, images.length]);
+
   const canBook = !!(data && currentUnit && selectedDates);
   const handleBooking = () => {
     if (!canBook) return;
@@ -201,6 +213,8 @@ export default function PropertyDetail() {
                   <img
                     src={images[selectedImage]}
                     alt={currentUnit?.name ?? data.property.name}
+                    loading="eager"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 )}
@@ -228,19 +242,25 @@ export default function PropertyDetail() {
                     >
                       <ChevronRight size={24} />
                     </button>
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                      {images.map((_, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setSelectedImage(idx)}
-                          className={`w-2 h-2 rounded-full transition-colors ${
-                            selectedImage === idx
-                              ? "bg-white"
-                              : "bg-white/50 hover:bg-white/70"
-                          }`}
-                          aria-label={`View image ${idx + 1}`}
-                        />
-                      ))}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                      {images.length <= 15 ? (
+                        images.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedImage(idx)}
+                            className={`w-2 h-2 rounded-full transition-colors flex-shrink-0 ${
+                              selectedImage === idx
+                                ? "bg-white"
+                                : "bg-white/50 hover:bg-white/70"
+                            }`}
+                            aria-label={`View image ${idx + 1}`}
+                          />
+                        ))
+                      ) : (
+                        <span className="text-white/90 text-sm font-medium">
+                          {selectedImage + 1} / {images.length}
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
@@ -258,24 +278,56 @@ export default function PropertyDetail() {
                 </button>
               </div>
 
-              {/* Thumbnail Gallery */}
-              <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-2 gap-2">
-                {images.map((image, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImage(idx)}
-                    className={`rounded-lg overflow-hidden h-32 md:h-24 transition-all ${
-                      selectedImage === idx ? "ring-4 ring-accent" : ""
+              {/* Thumbnail Gallery - adaptive: few images fill space, many use scroll */}
+              {(() => {
+                const isMany = images.length > 9;
+                const cols = isMany ? undefined : Math.min(3, Math.max(1, Math.ceil(Math.sqrt(images.length))));
+                const rows = isMany ? 3 : Math.ceil(images.length / cols) || 1;
+                return (
+                  <div
+                    ref={thumbScrollRef}
+                    className={`md:col-span-2 h-96 md:h-[500px] rounded-lg ${
+                      isMany ? "overflow-x-auto overflow-y-hidden scroll-smooth" : "overflow-hidden"
                     }`}
+                    style={isMany ? { scrollbarWidth: "thin" } : undefined}
                   >
-                    <img
-                      src={image}
-                      alt={`View ${idx + 1}`}
-                      className="w-full h-full object-cover hover:scale-110 transition-transform"
-                    />
-                  </button>
-                ))}
-              </div>
+                    <div
+                      className={`grid gap-2 h-full p-1 ${
+                        isMany ? "grid-flow-col grid-rows-3 auto-cols-[110px] md:auto-cols-[140px]" : ""
+                      }`}
+                      style={
+                        isMany
+                          ? { minHeight: "100%" }
+                          : {
+                              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                              gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+                            }
+                      }
+                    >
+                      {images.map((image, idx) => (
+                        <button
+                          key={idx}
+                          data-thumb-index={idx}
+                          onClick={() => setSelectedImage(idx)}
+                          className={`rounded-lg overflow-hidden min-w-0 min-h-0 w-full h-full transition-all ${
+                            selectedImage === idx
+                              ? "ring-2 ring-accent ring-offset-1 ring-offset-black"
+                              : ""
+                          }`}
+                        >
+                          <img
+                            src={image}
+                            alt={`View ${idx + 1}`}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover hover:scale-105 transition-transform"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -387,7 +439,10 @@ export default function PropertyDetail() {
                               src={getViewVideoPath(data.property.name, currentUnit.name)!}
                               controls
                               playsInline
-                              preload="metadata"
+                              preload="auto"
+                              autoPlay
+                              muted
+                              loop
                               onPlay={() => setVideoStarted(true)}
                               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                             />
