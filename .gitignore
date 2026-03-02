@@ -24,4 +24,8 @@ dist-ssr
 *.sw?
 
 .config/
-!.env
+
+# Never commit secrets
+.env
+.env.local
+.env.*.local
