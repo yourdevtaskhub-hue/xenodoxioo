@@ -70,7 +70,7 @@ export default function Properties() {
         const json = await response.json();
         const data = (json.data ?? []) as any[];
 
-        const mapped: UnitWithProperty[] = data.map((u) => ({
+        const mapped: UnitWithProperty[] = (data || []).map((u) => ({
           id: u.id,
           propertyId: u.propertyId,
           name: u.name,
