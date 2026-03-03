@@ -54,8 +54,20 @@ function PricingAndDiscounts() {
       if (res.ok) {
         const data = await res.json();
         console.log("✅ [PRICING] Pricing data:", data);
+        
+        // Validate and sanitize data to prevent undefined errors
+        const safeCoupons = (data.coupons || []).map((coupon: any) => ({
+          ...coupon,
+          discountValue: coupon.discountValue || 0,
+          validFrom: coupon.validFrom || new Date().toISOString(),
+          validUntil: coupon.validUntil || new Date().toISOString(),
+          minBookingAmount: coupon.minBookingAmount || 0,
+          maxUses: coupon.maxUses || null,
+          usedCount: coupon.usedCount || 0
+        }));
+        
         setSeasonalPricing(data.seasonalPricing || []);
-        setCoupons(data.coupons || []);
+        setCoupons(safeCoupons);
       } else {
         console.error("❌ [PRICING] Failed to fetch pricing:", res.status);
       }
