@@ -16,7 +16,7 @@
     "build:client": "vite build --config vite.config.client.ts",
     "build:server": "vite build --config vite.config.server.ts",
     "build:github-pages": "cross-env VITE_BASE_URL=/xenodoxioo/ pnpm run build:client",
-    "deploy": "node deploy-to-github-pages.js",
+    "deploy": "node deploy-to-github-pages.cjs",
     "preview": "vite preview --outDir dist/spa",
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
