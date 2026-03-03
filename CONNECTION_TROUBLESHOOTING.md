@@ -26,7 +26,8 @@ Free-tier Supabase projects **pause after 7 days of inactivity**.
 3. Replace `[YOUR-PASSWORD]` with your database password.
 4. In your project root, set in `.env`:
    ```env
-   DATABASE_URL="postgresql://postgres.[ref]:[YOUR-PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres"
+   # Pooler (often works when 5432 is blocked). For Prisma add pgbouncer=true:
+   DATABASE_URL="postgresql://postgres.[ref]:[YOUR-PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
    ```
    Or use the **Direct connection** (port 5432) if you prefer.
 
@@ -49,6 +50,22 @@ npx tsx scripts/phase7-pricing-verification.ts
 ```
 
 If the script connects and runs, the database is reachable from your machine.
+
+## 5. Phase 7 fallback (no local DB access)
+
+If you cannot connect from your network at all, you can still complete **Phase 7** by running a generated SQL script **inside Supabase Dashboard**:
+
+```bash
+npm run migration:phase7:dashboard
+```
+
+This generates `supabase-phase7-pricing-compare.sql`.
+
+Then:
+
+1. Supabase Dashboard → **SQL Editor**
+2. Paste the contents of `supabase-phase7-pricing-compare.sql`
+3. Run it and confirm `unit_mismatches`, `booking_mismatches`, `coupon_mismatches` are **0**
 
 ---
 

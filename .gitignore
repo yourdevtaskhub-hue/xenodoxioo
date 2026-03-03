@@ -29,3 +29,6 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Generated migration verification artifacts
+supabase-phase7-pricing-compare.sql
