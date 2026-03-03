@@ -246,6 +246,16 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // Handle image uploads
+    if (path.startsWith('/uploads/')) {
+      return await handleImageServe(path, supabase);
+    }
+
+    // Handle admin routes
+    if (path.startsWith('/api/admin/')) {
+      return await handleAdminRoutes(path, method, supabase, event);
+    }
+
     // Default response for other routes
     return {
       statusCode: 200,
@@ -271,3 +281,224 @@ export const handler = async (event: any, context: any) => {
     };
   }
 };
+
+// Admin routes handler
+async function handleAdminRoutes(path: string, method: string, supabase: any, event: any) {
+  console.log(`🔧 [ADMIN] ${method} ${path}`);
+
+  try {
+    // GET /api/admin/stats
+    if (path === '/api/admin/stats' && method === 'GET') {
+      const [bookingsResult, usersResult, propertiesResult] = await Promise.all([
+        supabase.from('bookings').select('status'),
+        supabase.from('users').select('id', { count: 'exact' }),
+        supabase.from('properties').select('id', { count: 'exact' })
+      ]);
+
+      const bookings = bookingsResult.data || [];
+      const stats = {
+        totalBookings: bookings.length,
+        confirmedBookings: bookings.filter((b: any) => b.status === 'CONFIRMED').length,
+        pendingBookings: bookings.filter((b: any) => b.status === 'PENDING').length,
+        cancelledBookings: bookings.filter((b: any) => b.status === 'CANCELLED').length,
+        totalRevenue: bookings.reduce((sum: any, b: any) => sum + (b.total_price || 0), 0),
+        totalUsers: usersResult.count || 0,
+        propertiesCount: propertiesResult.count || 0,
+        occupancyByProperty: [],
+        activeUsers: usersResult.count || 0
+      };
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: stats
+        })
+      };
+    }
+
+    // GET /api/admin/properties
+    if (path === '/api/admin/properties' && method === 'GET') {
+      const { data: properties, error } = await supabase
+        .from('properties')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(properties || [])
+      };
+    }
+
+    // GET /api/admin/units
+    if (path === '/api/admin/units' && method === 'GET') {
+      const { data: units, error } = await supabase
+        .from('units')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(units || [])
+      };
+    }
+
+    // GET /api/admin/pricing
+    if (path === '/api/admin/pricing' && method === 'GET') {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seasonalPricing: [],
+          coupons: []
+        })
+      };
+    }
+
+    // GET /api/admin/bookings
+    if (path === '/api/admin/bookings' && method === 'GET') {
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          unit:units(id,name,property:properties(id,name)),
+          user:users(id,email,first_name,last_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookings: bookings || [],
+          totalPages: 1
+        })
+      };
+    }
+
+    // GET /api/admin/users
+    if (path === '/api/admin/users' && method === 'GET') {
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          users: users || []
+        })
+      };
+    }
+
+    // POST /api/admin/upload-image
+    if (path === '/api/admin/upload-image' && method === 'POST') {
+      // For now, return a placeholder URL
+      // In production, you'd upload to Supabase storage or similar
+      const placeholderUrl = `https://picsum.photos/400/300?random=${Date.now()}`;
+      
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          imageUrl: placeholderUrl
+        })
+      };
+    }
+
+    // Default admin route response
+    return {
+      statusCode: 404,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        success: false,
+        message: 'Admin route not found',
+        path: path
+      })
+    };
+
+  } catch (error: any) {
+    console.error('❌ Admin route error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        success: false,
+        message: 'Admin server error',
+        error: error.message
+      })
+    };
+  }
+}
+
+// Image serving handler
+async function handleImageServe(path: string, supabase: any) {
+  console.log(`🖼️ [IMAGE] Serving: ${path}`);
+  
+  try {
+    const filename = path.replace('/uploads/', '');
+    
+    // For now, redirect to a placeholder image service
+    // In production, you'd serve from Supabase storage or CDN
+    const placeholderUrl = `https://picsum.photos/400/300?random=${filename}`;
+    
+    return {
+      statusCode: 302,
+      headers: {
+        'Location': placeholderUrl,
+        'Cache-Control': 'public, max-age=3600'
+      }
+    };
+    
+  } catch (error: any) {
+    console.error('❌ Image serve error:', error);
+    return {
+      statusCode: 404,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        success: false,
+        message: 'Image not found',
+        error: error.message
+      })
+    };
+  }
+}
