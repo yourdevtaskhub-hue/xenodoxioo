@@ -116,6 +116,7 @@ export const handler = async (event: any, context: any) => {
             parsedGalleryImages = [];
           }
         }
+        }
 
         const parsedUnits = propertyUnits.map((unit: any) => {
           let parsedImages = [];
