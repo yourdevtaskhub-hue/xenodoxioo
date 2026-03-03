@@ -174,6 +174,193 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
   console.log(`🔧 [${requestId}] ${method} ${path}`);
 
   try {
+    // GET /api/admin/stats
+    if (path === '/api/admin/stats' && method === 'GET') {
+      const [bookingsResult, usersResult, propertiesResult] = await Promise.all([
+        supabase.from('bookings').select('status'),
+        supabase.from('users').select('id', { count: 'exact' }),
+        supabase.from('properties').select('id', { count: 'exact' })
+      ]);
+
+      const bookings = bookingsResult.data || [];
+      const stats = {
+        totalBookings: bookings.length,
+        confirmedBookings: bookings.filter((b: any) => b.status === 'CONFIRMED').length,
+        pendingBookings: bookings.filter((b: any) => b.status === 'PENDING').length,
+        cancelledBookings: bookings.filter((b: any) => b.status === 'CANCELLED').length,
+        totalRevenue: bookings.reduce((sum: any, b: any) => sum + (b.total_price || 0), 0),
+        totalUsers: usersResult.count || 0,
+        propertiesCount: propertiesResult.count || 0,
+        occupancyByProperty: [],
+        activeUsers: usersResult.count || 0
+      };
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: stats
+        })
+      };
+    }
+
+    // GET /api/admin/users
+    if (path === '/api/admin/users' && method === 'GET') {
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: users || []
+        })
+      };
+    }
+
+    // GET /api/admin/properties
+    if (path === '/api/admin/properties' && method === 'GET') {
+      const { data: properties, error } = await supabase
+        .from('properties')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: properties || []
+        })
+      };
+    }
+
+    // GET /api/admin/units
+    if (path === '/api/admin/units' && method === 'GET') {
+      const { data: units, error } = await supabase
+        .from('units')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: units || []
+        })
+      };
+    }
+
+    // GET /api/admin/bookings
+    if (path === '/api/admin/bookings' && method === 'GET') {
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: bookings || []
+        })
+      };
+    }
+
+    // GET /api/admin/pricing
+    if (path === '/api/admin/pricing' && method === 'GET') {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            currency: 'EUR',
+            taxRate: 0.24,
+            depositPercentage: 25
+          }
+        })
+      };
+    }
+
+    // GET /api/admin/coupons
+    if (path === '/api/admin/coupons' && method === 'GET') {
+      const { data: coupons, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: coupons || []
+        })
+      };
+    }
+
+    // GET /api/admin/settings/tax
+    if (path === '/api/admin/settings/tax' && method === 'GET') {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            taxRate: 0.24,
+            currency: 'EUR'
+          }
+        })
+      };
+    }
+
     // POST /api/admin/properties
     if (path === '/api/admin/properties' && method === 'POST') {
       const body = JSON.parse(event.body || '{}');
@@ -232,6 +419,92 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ success: true, data, requestId })
       };
+    }
+
+    // POST /api/admin/upload-image
+    if (path === '/api/admin/upload-image' && method === 'POST') {
+      console.log(`🖼️ [${requestId}] === IMAGE UPLOAD START ===`);
+      try {
+        const body = JSON.parse(event.body || '{}');
+        console.log(`📝 [${requestId}] Upload payload:`, JSON.stringify(body, null, 2));
+        
+        const { base64Data, filename } = body;
+        
+        if (!base64Data) {
+          console.error(`❌ [${requestId}] Missing base64Data`);
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              success: false, 
+              error: 'Missing base64Data',
+              requestId 
+            })
+          };
+        }
+        
+        // Generate filename if not provided
+        const finalFilename = filename || `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
+        console.log(`🖼️ [${requestId}] Processing upload: ${finalFilename}`);
+        
+        // Convert base64 to buffer
+        const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Content, 'base64');
+        
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('uploads')
+          .upload(finalFilename, buffer, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
+
+        console.log(`🔍 [${requestId}] Supabase upload response:`, { data, error });
+
+        if (error) {
+          console.error(`❌ [${requestId}] Upload error:`, error);
+          return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              success: false, 
+              error: error.message,
+              requestId 
+            })
+          };
+        }
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('uploads')
+          .getPublicUrl(finalFilename);
+          
+        console.log(`✅ [${requestId}] Upload successful: ${publicUrl}`);
+        
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            imageUrl: publicUrl,
+            filename: finalFilename,
+            requestId
+          })
+        };
+        
+      } catch (error: any) {
+        console.error(`❌ [${requestId}] Upload error:`, error);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            success: false, 
+            error: error.message,
+            stack: error.stack,
+            requestId 
+          })
+        };
+      }
     }
 
     // Default admin route response
