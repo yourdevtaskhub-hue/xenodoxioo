@@ -87,12 +87,25 @@ export const handler = async (event: any, context: any) => {
 
       console.log(`✅ Found ${properties?.length || 0} properties and ${units?.length || 0} units`);
 
+      // Use price table for room prices (matches admin Τιμές & Περίοδος)
+      let getMinPrice: (name: string) => number | null = () => null;
+      let getClosed: (name: string) => { closed: boolean; reopenDate: string | null } = () => ({ closed: false, reopenDate: null });
+      try {
+        const pt = await import('../../server/services/price-table.service');
+        getMinPrice = pt.getMinimumPriceForRoom;
+        getClosed = pt.getRoomClosedStatusAndReopenDate;
+      } catch (e) {
+        console.warn(`⚠️ [${requestId}] Price table not loaded, using DB base_price`);
+      }
+
       // Transform properties to match frontend expectations
       const aggregatedProperties = properties.map((property) => {
         const propertyUnits = units?.filter((u) => u.property_id === property.id) || [];
-        const minPrice = propertyUnits.length > 0 
-          ? Math.min(...propertyUnits.map((u) => u.base_price))
-          : 0;
+        const unitPrices = propertyUnits.map((u) => {
+          const fromTable = getMinPrice(u.name);
+          return fromTable ?? (Number(u.base_price) || 0);
+        });
+        const minPrice = unitPrices.length > 0 ? Math.min(...unitPrices) : 0;
 
         return {
           id: property.id,
@@ -107,18 +120,24 @@ export const handler = async (event: any, context: any) => {
           isActive: property.is_active,
           createdAt: property.created_at,
           updatedAt: property.updated_at,
-          units: propertyUnits.map((unit: any) => ({
-            ...unit,
-            images: unit.images ? (typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images) : [],
-            propertyId: unit.property_id,
-            maxGuests: unit.max_guests,
-            bedrooms: unit.bedrooms,
-            bathrooms: unit.bathrooms,
-            basePrice: unit.base_price,
-            cleaningFee: unit.cleaning_fee,
-            minStayDays: unit.min_stay_days,
-            isActive: unit.is_active
-          })),
+          units: propertyUnits.map((unit: any) => {
+            const basePrice = getMinPrice(unit.name) ?? (Number(unit.base_price) || 0);
+            const { closed: closedForCurrentPeriod, reopenDate } = getClosed(unit.name);
+            return {
+              ...unit,
+              images: unit.images ? (typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images) : [],
+              propertyId: unit.property_id,
+              maxGuests: unit.max_guests,
+              bedrooms: unit.bedrooms,
+              bathrooms: unit.bathrooms,
+              basePrice,
+              cleaningFee: unit.cleaning_fee,
+              minStayDays: unit.min_stay_days,
+              isActive: unit.is_active,
+              closedForCurrentPeriod,
+              reopenDate
+            };
+          }),
           unitsCount: propertyUnits.length,
           startingFrom: minPrice,
           _count: { units: propertyUnits.length },
@@ -175,26 +194,26 @@ export const handler = async (event: any, context: any) => {
 
       console.log(`✅ [${requestId}] Found property with ${units?.length || 0} units`);
 
-      // Transform data to match frontend expectations
+      let getMinPrice: (name: string) => number | null = () => null;
+      let getClosed: (name: string) => { closed: boolean; reopenDate: string | null } = () => ({ closed: false, reopenDate: null });
+      try {
+        const pt = await import('../../server/services/price-table.service');
+        getMinPrice = pt.getMinimumPriceForRoom;
+        getClosed = pt.getRoomClosedStatusAndReopenDate;
+      } catch {}
+
       const transformedProperty = {
         ...property,
         gallery_images: property.gallery_images || [],
         units: (units || []).map((unit: any) => {
-          // Parse images JSON string to array
           let parsedImages = [];
           if (unit.images) {
             try {
-              if (typeof unit.images === 'string') {
-                parsedImages = JSON.parse(unit.images);
-              } else if (Array.isArray(unit.images)) {
-                parsedImages = unit.images;
-              }
-            } catch (error) {
-              console.log(`⚠️ [${requestId}] Failed to parse images for unit:`, unit.id, error);
-              parsedImages = [];
-            }
+              parsedImages = typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images;
+            } catch {}
           }
-
+          const basePrice = getMinPrice(unit.name) ?? (Number(unit.base_price) || 0);
+          const { closed: closedForCurrentPeriod, reopenDate } = getClosed(unit.name);
           return {
             ...unit,
             images: parsedImages,
@@ -202,10 +221,12 @@ export const handler = async (event: any, context: any) => {
             maxGuests: unit.max_guests,
             bedrooms: unit.bedrooms,
             bathrooms: unit.bathrooms,
-            basePrice: Number(unit.base_price) || 0,
+            basePrice,
             cleaningFee: Number(unit.cleaning_fee) || 0,
             minStayDays: unit.min_stay_days || 1,
-            isActive: unit.is_active
+            isActive: unit.is_active,
+            closedForCurrentPeriod,
+            reopenDate
           };
         })
       };
@@ -259,26 +280,26 @@ export const handler = async (event: any, context: any) => {
 
       console.log(`✅ [${requestId}] Found property with ${units?.length || 0} units`);
 
-      // Transform data to match frontend expectations
+      let getMinPrice: (name: string) => number | null = () => null;
+      let getClosed: (name: string) => { closed: boolean; reopenDate: string | null } = () => ({ closed: false, reopenDate: null });
+      try {
+        const pt = await import('../../server/services/price-table.service');
+        getMinPrice = pt.getMinimumPriceForRoom;
+        getClosed = pt.getRoomClosedStatusAndReopenDate;
+      } catch {}
+
       const transformedProperty = {
         ...property,
         gallery_images: property.gallery_images || [],
         units: (units || []).map((unit: any) => {
-          // Parse images JSON string to array
           let parsedImages = [];
           if (unit.images) {
             try {
-              if (typeof unit.images === 'string') {
-                parsedImages = JSON.parse(unit.images);
-              } else if (Array.isArray(unit.images)) {
-                parsedImages = unit.images;
-              }
-            } catch (error) {
-              console.log(`⚠️ [${requestId}] Failed to parse images for unit:`, unit.id, error);
-              parsedImages = [];
-            }
+              parsedImages = typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images;
+            } catch {}
           }
-
+          const basePrice = getMinPrice(unit.name) ?? (Number(unit.base_price) || 0);
+          const { closed: closedForCurrentPeriod, reopenDate } = getClosed(unit.name);
           return {
             ...unit,
             images: parsedImages,
@@ -286,10 +307,12 @@ export const handler = async (event: any, context: any) => {
             maxGuests: unit.max_guests,
             bedrooms: unit.bedrooms,
             bathrooms: unit.bathrooms,
-            basePrice: Number(unit.base_price) || 0,
+            basePrice,
             cleaningFee: Number(unit.cleaning_fee) || 0,
             minStayDays: unit.min_stay_days || 1,
-            isActive: unit.is_active
+            isActive: unit.is_active,
+            closedForCurrentPeriod,
+            reopenDate
           };
         })
       };
@@ -506,6 +529,12 @@ export const handler = async (event: any, context: any) => {
       }
     }
 
+    // Handle inquiries routes (admin list, detail, reply)
+    if (path.startsWith('/api/inquiries/')) {
+      const inquiryRes = await handleInquiriesRoutes(path, method, supabase, event, requestId);
+      if (inquiryRes) return inquiryRes;
+    }
+
     // Handle admin routes
     if (path.startsWith('/api/admin/')) {
       return await handleAdminRoutes(path, method, supabase, event, requestId);
@@ -538,6 +567,144 @@ export const handler = async (event: any, context: any) => {
     };
   }
 };
+
+// Inquiries routes handler (admin list, detail, reply)
+async function handleInquiriesRoutes(path: string, method: string, supabase: any, event: any, requestId: string): Promise<any> {
+  try {
+    // GET /api/inquiries/admin/list
+    if (path === '/api/inquiries/admin/list' && method === 'GET') {
+      const qs = event.queryStringParameters || {};
+      const status = qs.status;
+      const page = parseInt(qs.page || '1', 10);
+      const pageSize = parseInt(qs.pageSize || '10', 10);
+
+      let query = supabase
+        .from('inquiries')
+        .select('*, property:properties(name, location)', { count: 'exact' });
+
+      if (status && status !== 'ALL') query = query.eq('status', status);
+
+      const { data, count, error } = await query
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: error.message })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            inquiries: data || [],
+            total: count ?? 0,
+            page,
+            pageSize
+          }
+        })
+      };
+    }
+
+    // GET /api/inquiries/admin/:id
+    const adminDetailMatch = path.match(/^\/api\/inquiries\/admin\/([^/]+)$/);
+    if (adminDetailMatch && method === 'GET') {
+      const id = adminDetailMatch[1];
+      const { data: inquiry, error } = await supabase
+        .from('inquiries')
+        .select('*, property:properties(name, location)')
+        .eq('id', id)
+        .single();
+
+      if (error || !inquiry) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Inquiry not found' })
+        };
+      }
+
+      const { data: messages } = await supabase
+        .from('inquiry_messages')
+        .select('*')
+        .eq('inquiry_id', id)
+        .order('created_at', { ascending: true });
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          data: {
+            inquiry,
+            messages: messages || []
+          }
+        })
+      };
+    }
+
+    // POST /api/inquiries/admin/:id/reply
+    const adminReplyMatch = path.match(/^\/api\/inquiries\/admin\/([^/]+)\/reply$/);
+    if (adminReplyMatch && method === 'POST') {
+      const id = adminReplyMatch[1];
+      let body: { message?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON' })
+        };
+      }
+      const { message } = body;
+      if (!message) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'message is required' })
+        };
+      }
+
+      const { data: inquiry } = await supabase.from('inquiries').select('*').eq('id', id).single();
+      if (!inquiry) {
+        return {
+          statusCode: 404,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Inquiry not found' })
+        };
+      }
+
+      await supabase.from('inquiry_messages').insert({
+        inquiry_id: id,
+        sender_type: 'host',
+        message
+      });
+
+      await supabase.from('inquiries').update({ status: 'ANSWERED' }).eq('id', id);
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true })
+      };
+    }
+
+    return null; // Not an inquiries route we handle
+  } catch (err: any) {
+    console.error(`❌ [${requestId}] Inquiries error:`, err);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: false, error: err?.message || 'Server error' })
+    };
+  }
+}
 
 // Admin routes handler
 async function handleAdminRoutes(path: string, method: string, supabase: any, event: any, requestId: string) {
@@ -917,26 +1084,126 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/bookings
     if (path === '/api/admin/bookings' && method === 'GET') {
-      const { data: bookings, error } = await supabase
+      const qs = event.queryStringParameters || {};
+      const page = parseInt(qs.page || '1', 10);
+      const pageSize = parseInt(qs.pageSize || '20', 10);
+      const status = qs.status;
+      const search = qs.search;
+
+      let query = supabase
         .from('bookings')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select(`
+          *,
+          unit:units(id, name, property_id, property:properties(id, name)),
+          user:users(id, email, first_name, last_name)
+        `, { count: 'exact' });
+
+      if (status && status !== 'ALL') {
+        query = query.eq('status', status);
+      }
+      if (search) {
+        query = query.or(`booking_number.ilike.%${search}%,guest_name.ilike.%${search}%,guest_email.ilike.%${search}%`);
+      }
+
+      const { data: rows, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
 
       if (error) {
         return {
           statusCode: 500,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: error.message })
+          body: JSON.stringify({ success: false, error: error.message })
         };
       }
+
+      const bookings = (rows || []).map((b: any) => ({
+        id: b.id,
+        bookingNumber: b.booking_number,
+        unit: {
+          id: b.unit?.id,
+          name: b.unit?.name || 'Unknown Unit',
+          property: {
+            id: b.unit?.property_id || b.unit?.property?.id,
+            name: b.unit?.property?.name || 'Unknown Property'
+          }
+        },
+        user: b.user ? {
+          id: b.user.id,
+          email: b.user.email,
+          firstName: b.user.first_name,
+          lastName: b.user.last_name
+        } : null,
+        guestName: b.guest_name,
+        guestEmail: b.guest_email,
+        guestPhone: b.guest_phone,
+        checkInDate: b.check_in_date,
+        checkOutDate: b.check_out_date,
+        nights: b.nights,
+        guests: b.guests,
+        totalPrice: parseFloat(b.total_price) || 0,
+        totalPaid: parseFloat(b.total_paid) || 0,
+        remainingAmount: parseFloat(b.remaining_amount) ?? (parseFloat(b.total_price) || 0) - (parseFloat(b.total_paid) || 0),
+        depositAmount: parseFloat(b.deposit_amount) || 0,
+        paymentType: b.payment_type || 'FULL',
+        scheduledChargeDate: b.scheduled_charge_date || null,
+        status: b.status,
+        paymentStatus: b.payment_status,
+        createdAt: b.created_at
+      }));
+
+      const totalItems = count ?? bookings.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           success: true,
-          data: bookings || []
+          bookings,
+          totalPages,
+          currentPage: page,
+          totalItems
         })
+      };
+    }
+
+    // PUT /api/admin/bookings/:id/status
+    if (path.match(/^\/api\/admin\/bookings\/[^/]+\/status$/) && method === 'PUT') {
+      const id = path.split('/')[4];
+      let body: { status?: string } = {};
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON' })
+        };
+      }
+      const { status } = body;
+      if (!status) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'status is required' })
+        };
+      }
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status })
+        .eq('id', id);
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: error.message })
+        };
+      }
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true })
       };
     }
 

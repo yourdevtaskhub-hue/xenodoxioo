@@ -139,7 +139,7 @@ export default function About() {
               >
                 <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-luxury-md">
                   <img
-                    src="/645696801_1911893926199490_2525005987881341297_n.jpg"
+                    src="/aboutus.jpg"
                     alt="Villa interior"
                     className="w-full h-full object-cover"
                   />
