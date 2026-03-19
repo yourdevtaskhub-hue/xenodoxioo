@@ -123,6 +123,9 @@ export default function About() {
                 <h2 className="luxury-heading text-3xl md:text-4xl text-foreground">
                   {t("about.philosophy.title")}
                 </h2>
+                <p className="mt-2 text-lg text-primary/90 font-medium">
+                  {t("about.philosophy.subtitle")}
+                </p>
                 <div className="luxury-divider my-8" />
                 <div className="space-y-6 text-muted-foreground leading-relaxed text-base md:text-lg">
                   <p>{t("about.philosophy.p1")}</p>

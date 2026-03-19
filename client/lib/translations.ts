@@ -798,9 +798,10 @@ export const translations: Record<Language, Record<string, string>> = {
     // About
     "about.hero.subtitle": "Building luxury villas for over two decades in the heart of Arcadia. Six homes between Argolikos Kolpos and Myrtoon Pelagos — where sea, light, and calm meet.",
     "about.philosophy.title": "Our Philosophy",
+    "about.philosophy.subtitle": "Villas on the East Coast of the Peloponnese",
     "about.philosophy.p1": "Leonidionhouses, operating since 2011, is recognized across the largest vacation rental platforms. Our commitment to hospitality and the trust of our guests are our credentials.",
     "about.philosophy.p2": "Through our own website, we are pleased to offer direct communication and complete concierge-level service at transparent, competitive rates.",
-    "about.philosophy.p3": "We believe in authentic experiences — not mass tourism. Each villa is cared for with intention, and every guest is treated as our only guest.",
+    "about.philosophy.p3": "Our villas are carefully built and equipped with selected furniture and objects, so as to offer an authentic experience to our guests.",
     "about.trust.title": "Trust & Credentials",
     "about.trust.years": "Years of Operation",
     "about.trust.yearsVal": "Since 2011",
@@ -817,7 +818,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "about.features.experience": "Hospitality Experience",
     "about.features.experienceDesc": "In vacation rentals since 2011",
 
-    "about.leonidionhouses.intro1": "Built on a 25-stremma hillside with stunning views of the Argolic Gulf and the Myrtoan Sea, between Tyros and Leonidion, our 6 houses offer comfort and privacy in an utterly serene setting. From simple to luxurious, the houses are built in a dialectical relationship with the environment, organically integrated into the landscape with local materials, in forms that emerge from the terrain. Two small beaches, exclusively accessible in 3 to 6 minutes on foot from the houses, are at our guests' disposal.",
+    "about.leonidionhouses.intro1": "Built on a 25,000 m² hillside with stunning views of the Argolic Gulf and the Myrtoon Sea, between Tyros and Leonidion, our 6 houses offer comfort and privacy in an utterly serene setting. From simple to luxurious, the houses are built in a dialectical relationship with the environment, organically integrated into the landscape with local materials, in forms that emerge from the terrain. Two small beaches, exclusively accessible in 3 to 6 minutes on foot from the houses, are at our guests' disposal.",
     "about.leonidionhouses.intro2": "Leonidionhouses, operating since 2011, is already known from the largest vacation rental platforms. Our commitment to hospitality and our guests' reviews are our credentials. Now, through our own website, we are pleased to offer you direct communication and fuller service at more competitive prices.",
     "about.ograHouse.title": "Ogra House",
     "about.ograHouse.p1": "Ogra House occupies the ground floor of a large residence and consists of a vast living room, kitchen, 4 bedrooms and 3 bathrooms. It can accommodate up to 10 people. Ideal for large families and groups of friends.",
@@ -1574,9 +1575,10 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "about.hero.subtitle": "Construction de villas de luxe depuis plus de deux décennies au cœur de l'Arcadie. Six demeures entre le golfe d'Argolide et la mer Myrtoan — où mer, lumière et sérénité se rencontrent.",
     "about.philosophy.title": "Notre philosophie",
+    "about.philosophy.subtitle": "Villas sur la côte est du Péloponnèse",
     "about.philosophy.p1": "Leonidionhouses, en activité depuis 2011, est reconnu sur les plus grandes plateformes de location. Notre engagement envers l'hospitalité et la confiance de nos clients sont nos références.",
     "about.philosophy.p2": "Grâce à notre site, nous sommes ravis de vous offrir une communication directe et un service complet, digne d'un concierge, à des tarifs transparents et compétitifs.",
-    "about.philosophy.p3": "Nous croyons aux expériences authentiques — pas au tourisme de masse. Chaque villa est entretenue avec soin, et chaque client est traité comme notre seul client.",
+    "about.philosophy.p3": "Nos villas sont soigneusement construites et équipées de meubles et objets sélectionnés, afin d'offrir une expérience authentique à nos clients.",
     "about.trust.title": "Confiance et références",
     "about.trust.years": "Années d'activité",
     "about.trust.yearsVal": "Depuis 2011",
@@ -1593,7 +1595,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "about.features.experience": "Expérience en hospitalité",
     "about.features.experienceDesc": "En location de vacances depuis 2011",
 
-    "about.leonidionhouses.intro1": "Construites sur un versant de 25 stremmas avec une vue imprenable sur le golfe d'Argolide et la mer Myrtoan, entre Tyros et Léonidion, nos 6 maisons offrent confort et intimité dans un cadre absolument serein. Du simple au luxueux, les maisons sont construites en relation dialectique avec l'environnement, intégrées organiquement au paysage avec des matériaux locaux, dans des formes qui émergent du terrain. Deux petites plages, accessibles exclusivement à pied en 3 à 6 minutes depuis les maisons, sont à la disposition de nos visiteurs.",
+    "about.leonidionhouses.intro1": "Construites sur un versant de 25 000 m² avec une vue imprenable sur le golfe d'Argolide et la mer Myrtoon, entre Tyros et Léonidion, nos 6 maisons offrent confort et intimité dans un cadre absolument serein. Du simple au luxueux, les maisons sont construites en relation dialectique avec l'environnement, intégrées organiquement au paysage avec des matériaux locaux, dans des formes qui émergent du terrain. Deux petites plages, accessibles exclusivement à pied en 3 à 6 minutes depuis les maisons, sont à la disposition de nos visiteurs.",
     "about.leonidionhouses.intro2": "Leonidionhouses, en activité depuis 2011, est déjà connu sur les plus grandes plateformes de location de vacances. Notre engagement envers l'hospitalité et les avis de nos clients constituent nos références. Désormais, via notre propre site web, nous sommes heureux de vous offrir une communication directe et un service plus complet à des prix plus compétitifs.",
     "about.ograHouse.title": "Ogra House",
     "about.ograHouse.p1": "L'Ogra House occupe le rez-de-chaussée d'une grande résidence et se compose d'un vaste salon, cuisine, 4 chambres et 3 salles de bain. Il peut accueillir jusqu'à 10 personnes. Idéal pour les grandes familles et les groupes d'amis.",
@@ -2370,9 +2372,10 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "about.hero.subtitle": "Seit über zwei Jahrzehnten bauen wir Luxusvillen im Herzen Arkadiens. Sechs Häuser zwischen Argolischem Golf und Myrtoischem Meer — wo Meer, Licht und Ruhe sich treffen.",
     "about.philosophy.title": "Unsere Philosophie",
+    "about.philosophy.subtitle": "Villen an der Ostküste des Peloponnes",
     "about.philosophy.p1": "Leonidionhouses, seit 2011 tätig, ist auf den größten Ferienvermietungsplattformen bekannt. Unser Einsatz für Gastfreundschaft und das Vertrauen unserer Gäste sind unsere Referenzen.",
     "about.philosophy.p2": "Über unsere eigene Website bieten wir Ihnen direkte Kommunikation und vollständigen Concierge-Service zu transparenten, wettbewerbsfähigen Preisen.",
-    "about.philosophy.p3": "Wir glauben an authentische Erlebnisse — nicht an Massentourismus. Jede Villa wird mit Hingabe gepflegt, und jeder Gast wird behandelt, als wäre er unser einziger Gast.",
+    "about.philosophy.p3": "Unsere Villen sind sorgfältig gebaut und mit ausgewählten Möbeln und Objekten ausgestattet, um unseren Gästen ein authentisches Erlebnis zu bieten.",
     "about.trust.title": "Vertrauen und Referenzen",
     "about.trust.years": "Jahre im Betrieb",
     "about.trust.yearsVal": "Seit 2011",
@@ -2389,7 +2392,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "about.features.experience": "Erfahrung in Gastfreundschaft",
     "about.features.experienceDesc": "In der Ferienvermietung seit 2011",
 
-    "about.leonidionhouses.intro1": "Auf einem 25-Stremma-Hang mit atemberaubendem Blick auf den Argolischen Golf und das Myrtoische Meer erbaut, zwischen Tyros und Leonidion, bieten unsere 6 Häuser Komfort und Privatsphäre in einer absolut friedlichen Umgebung. Von einfach bis luxuriös sind die Häuser in dialektischer Beziehung zur Umwelt gebaut, organisch in die Landschaft mit lokalen Materialien integriert, in Formen, die aus dem Gelände entstehen. Zwei kleine Strände, ausschließlich in 3 bis 6 Minuten zu Fuß von den Häusern erreichbar, stehen unseren Gästen zur Verfügung.",
+    "about.leonidionhouses.intro1": "Auf einem 25.000 m² großen Hang mit atemberaubendem Blick auf den Argolischen Golf und das Myrtoische Meer erbaut, zwischen Tyros und Leonidion, bieten unsere 6 Häuser Komfort und Privatsphäre in einer absolut friedlichen Umgebung. Von einfach bis luxuriös sind die Häuser in dialektischer Beziehung zur Umwelt gebaut, organisch in die Landschaft mit lokalen Materialien integriert, in Formen, die aus dem Gelände entstehen. Zwei kleine Strände, ausschließlich in 3 bis 6 Minuten zu Fuß von den Häusern erreichbar, stehen unseren Gästen zur Verfügung.",
     "about.leonidionhouses.intro2": "Leonidionhouses, seit 2011 tätig, ist bereits auf den größten Ferienvermietungsplattformen bekannt. Unser Einsatz für Gastfreundschaft und die Bewertungen unserer Gäste sind unsere Referenzen. Jetzt bieten wir Ihnen über unsere eigene Website direkte Kommunikation und umfassenderen Service zu wettbewerbsfähigeren Preisen.",
     "about.ograHouse.title": "Ogra House",
     "about.ograHouse.p1": "Das Ogra House belegt das Erdgeschoss eines großen Wohnhauses und besteht aus einem geräumigen Wohnzimmer, Küche, 4 Schlafzimmern und 3 Badezimmern. Es kann bis zu 10 Personen beherbergen. Ideal für große Familien und Freundesgruppen.",
@@ -3222,9 +3225,10 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "about.hero.subtitle": "Κτίζουμε πολυτελείς βίλες εδώ και πάνω από δύο δεκαετίες στην καρδιά της Αρκαδίας. Έξι σπίτια ανάμεσα στον Αργολικό Κόλπο και το Μυρτώο Πέλαγος — όπου συναντιούνται θάλασσα, φως και ηρεμία.",
     "about.philosophy.title": "Η Φιλοσοφία μας",
+    "about.philosophy.subtitle": "Βίλες στην ανατολική ακτή της Πελοποννήσου",
     "about.philosophy.p1": "Τα Leonidionhouses, που λειτουργούν από το 2011, είναι γνωστά στις μεγαλύτερες πλατφόρμες ενοικίασης διακοπών. Η δέσμευσή μας στην φιλοξενία και η εμπιστοσύνη των επισκεπτών μας αποτελούν τα διαπιστευτήριά μας.",
     "about.philosophy.p2": "Μέσω της δικής μας ιστοσελίδας, είμαστε στην ευχάριστη θέση να σας προσφέρουμε άμεση επικοινωνία και πλήρη εξυπηρέτηση επιπέδου concierge σε διαφανείς, ανταγωνιστικές τιμές.",
-    "about.philosophy.p3": "Πιστεύουμε σε αυθεντικές εμπειρίες — όχι στον μαζικό τουρισμό. Κάθε βίλα φροντίζεται με προσοχή, και κάθε επισκέπτης αντιμετωπίζεται ως ο μόνος επισκέπτης μας.",
+    "about.philosophy.p3": "Οι βίλες μας είναι προσεκτικά χτισμένες και εξοπλισμένες με επιλεγμένα έπιπλα και αντικείμενα, ώστε να προσφέρουν μια αυθεντική εμπειρία στους επισκέπτες μας.",
     "about.trust.title": "Εμπιστοσύνη και Διαπιστευτήρια",
     "about.trust.years": "Χρόνια Λειτουργίας",
     "about.trust.yearsVal": "Από το 2011",
@@ -3241,7 +3245,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "about.features.experience": "Εμπειρία Φιλοξενίας",
     "about.features.experienceDesc": "Στην ενοικίαση διακοπών από το 2011",
 
-    "about.leonidionhouses.intro1": "Κτισμένα σε μια πλαγιά 25 στρεμμάτων με καταπληκτική θέα στον Αργολικό Κόλπο και το Μυρτώο Πέλαγος, μεταξύ του Τύρου και του Λεωνιδίου, τα 6 σπίτια μας προσφέρουν άνεση και ιδιωτικότητα σε ένα περιβάλλον απολύτως γαλήνιο. Απλά έως πολυτελή, τα σπίτια είναι κτισμένα σε διαλεκτική σχέση με το περιβάλλον, εντάσσονται οργανικά στο τοπίο με τοπικά υλικά, σε μορφές που προκύπτουν από τα δεδομένα του γηπέδου. Δύο μικρές παραλίες, αποκλειστικά προσβάσιμες σε 3 έως 6 λεπτά από τα σπίτια με τα πόδια, είναι στη διάθεση των επισκεπτών μας.",
+    "about.leonidionhouses.intro1": "Κτισμένα σε μια πλαγιά 25.000 m² με καταπληκτική θέα στον Αργολικό Κόλπο και το Μυρτώο Πέλαγος, μεταξύ του Τύρου και του Λεωνιδίου, τα 6 σπίτια μας προσφέρουν άνεση και ιδιωτικότητα σε ένα περιβάλλον απολύτως γαλήνιο. Απλά έως πολυτελή, τα σπίτια είναι κτισμένα σε διαλεκτική σχέση με το περιβάλλον, εντάσσονται οργανικά στο τοπίο με τοπικά υλικά, σε μορφές που προκύπτουν από τα δεδομένα του γηπέδου. Δύο μικρές παραλίες, αποκλειστικά προσβάσιμες σε 3 έως 6 λεπτά από τα σπίτια με τα πόδια, είναι στη διάθεση των επισκεπτών μας.",
     "about.leonidionhouses.intro2": "Τα Leonidionhouses, που λειτουργούν από το 2011, είναι ήδη γνωστά από τις μεγαλύτερες πλατφόρμες ενοικίασης τουριστικών καταλυμάτων. Η ενασχόλησή μας με τη φιλοξενία και οι κριτικές των πελατών μας αποτελούν τα διαπιστευτήριά μας. Πλέον, μέσω της δικής μας ιστοσελίδας, είμαστε στην ευχάριστη θέση να σας προσφέρουμε άμεση επικοινωνία και πληρέστερη εξυπηρέτηση σε ανταγωνιστικότερες τιμές.",
     "about.ograHouse.title": "Ogra House",
     "about.ograHouse.p1": "Το Ogra House καταλαμβάνει το ισόγειο μιας μεγάλης κατοικίας και αποτελείται από ένα τεράστιο καθιστικό, κουζίνα, 4 υπνοδωμάτια και 3 λουτρά. Μπορεί να φιλοξενήσει μέχρι 10 άτομα. Ιδανικό για μεγάλες οικογένειες και παρέες φίλων.",
