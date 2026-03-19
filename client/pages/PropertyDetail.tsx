@@ -24,6 +24,10 @@ import {
   Flame,
   ThermometerSun,
   LayoutGrid,
+  ListPlus,
+  Sofa,
+  Home,
+  Globe,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -32,6 +36,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import formatCurrency from "@/lib/currency";
@@ -244,6 +255,93 @@ function getUnitDescriptionKey(propertyName: string, unitName: string): string |
   return null;
 }
 
+// True if unit is Lykoskufi 1, 2, 5 or Ogra House (rooms with full amenities modal)
+function hasAmenitiesModal(unitName: string | undefined): boolean {
+  if (!unitName) return false;
+  const u = unitName.toLowerCase().trim().replace(/\s+/g, " ");
+  if (/ogra\s*house/i.test(u)) return true;
+  if (/lykoskufi\s*1|lykoskufi\s*2|lykoskufi\s*5|lykoskufi1|lykoskufi2|lykoskufi5/.test(u)) return true;
+  return false;
+}
+
+// Amenities modal data: Lykoskufi 1, 2, 5
+const LYKOSKUFI_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key: string; descKey?: string }> }> = [
+  { categoryKey: "amenities.modal.cat.parking", items: [{ key: "amenities.modal.parkingDesc", descKey: "amenities.modal.parkingDesc" }] },
+  { categoryKey: "amenities.modal.cat.internet", items: [{ key: "amenities.modal.internetDesc", descKey: "amenities.modal.internetDesc" }] },
+  { categoryKey: "amenities.modal.cat.kitchen", items: [
+    { key: "amenities.modal.diningTable" }, { key: "amenities.modal.coffeeMachine" }, { key: "amenities.modal.cleaningProducts" },
+    { key: "amenities.modal.toaster" }, { key: "amenities.modal.stovetop" }, { key: "amenities.modal.oven" },
+    { key: "amenities.modal.cookware" }, { key: "amenities.modal.electricKettle" }, { key: "amenities.modal.kitchen" },
+    { key: "amenities.modal.washingMachine" }, { key: "amenities.modal.dishwasher" }, { key: "amenities.modal.microwave" },
+    { key: "amenities.modal.refrigerator" },
+  ]},
+  { categoryKey: "amenities.modal.cat.bedroom", items: [{ key: "amenities.modal.linens" }, { key: "amenities.modal.wardrobe" }] },
+  { categoryKey: "amenities.modal.cat.bathroom", items: [
+    { key: "amenities.modal.toiletPaper" }, { key: "amenities.modal.towels" }, { key: "amenities.modal.bathtubOrShower" },
+    { key: "amenities.modal.privateBathroom" }, { key: "amenities.modal.toilet" }, { key: "amenities.modal.freeToiletries" },
+    { key: "amenities.modal.hairDryer" }, { key: "amenities.modal.shower" },
+  ]},
+  { categoryKey: "amenities.modal.cat.living", items: [{ key: "amenities.modal.diningArea" }, { key: "amenities.modal.sofa" }, { key: "amenities.modal.sittingArea" }] },
+  { categoryKey: "amenities.modal.cat.media", items: [{ key: "amenities.modal.flatScreenTV" }, { key: "amenities.modal.tv" }] },
+  { categoryKey: "amenities.modal.cat.roomFeatures", items: [
+    { key: "amenities.modal.outletNearBed" }, { key: "amenities.modal.dryingRack" }, { key: "amenities.modal.tiledFloor" },
+    { key: "amenities.modal.soundproofing" }, { key: "amenities.modal.privateEntrance" }, { key: "amenities.modal.iron" },
+  ]},
+  { categoryKey: "amenities.modal.cat.pets", items: [{ key: "amenities.modal.petsDesc", descKey: "amenities.modal.petsDesc" }] },
+  { categoryKey: "amenities.modal.cat.outdoor", items: [
+    { key: "amenities.modal.outdoorDining" }, { key: "amenities.modal.outdoorFurniture" }, { key: "amenities.modal.yard" },
+    { key: "amenities.modal.veranda" }, { key: "amenities.modal.garden" },
+  ]},
+  { categoryKey: "amenities.modal.cat.activities", items: [{ key: "amenities.modal.beach" }] },
+  { categoryKey: "amenities.modal.cat.views", items: [{ key: "amenities.modal.gardenView" }, { key: "amenities.modal.seaView" }, { key: "amenities.modal.view" }] },
+  { categoryKey: "amenities.modal.cat.building", items: [{ key: "amenities.modal.standalone" }] },
+  { categoryKey: "amenities.modal.cat.reception", items: [{ key: "amenities.modal.invoice" }] },
+  { categoryKey: "amenities.modal.cat.misc", items: [
+    { key: "amenities.modal.ac" }, { key: "amenities.modal.smokingBan" }, { key: "amenities.modal.heating" },
+    { key: "amenities.modal.familyRooms" }, { key: "amenities.modal.nonSmokingRooms" },
+  ]},
+  { categoryKey: "amenities.modal.cat.safety", items: [{ key: "amenities.modal.safe" }] },
+  { categoryKey: "amenities.modal.cat.languages", items: [{ key: "amenities.modal.langDe" }, { key: "amenities.modal.langEl" }, { key: "amenities.modal.langEn" }, { key: "amenities.modal.langFr" }] },
+];
+
+// Amenities modal data: Ogra House
+const OGRA_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key: string; descKey?: string }> }> = [
+  { categoryKey: "amenities.modal.cat.parking", items: [{ key: "amenities.modal.parkingDesc", descKey: "amenities.modal.parkingDesc" }] },
+  { categoryKey: "amenities.modal.cat.internet", items: [{ key: "amenities.modal.internetDesc", descKey: "amenities.modal.internetDesc" }] },
+  { categoryKey: "amenities.modal.cat.kitchen", items: [
+    { key: "amenities.modal.highChair" }, { key: "amenities.modal.diningTable" }, { key: "amenities.modal.coffeeMachine" },
+    { key: "amenities.modal.toaster" }, { key: "amenities.modal.stovetop" }, { key: "amenities.modal.oven" },
+    { key: "amenities.modal.cookware" }, { key: "amenities.modal.electricKettle" }, { key: "amenities.modal.kitchen" },
+    { key: "amenities.modal.washingMachine" }, { key: "amenities.modal.dishwasher" }, { key: "amenities.modal.microwave" },
+    { key: "amenities.modal.refrigerator" },
+  ]},
+  { categoryKey: "amenities.modal.cat.bedroom", items: [{ key: "amenities.modal.linens" }, { key: "amenities.modal.wardrobe" }] },
+  { categoryKey: "amenities.modal.cat.bathroom", items: [
+    { key: "amenities.modal.toiletPaper" }, { key: "amenities.modal.towels" }, { key: "amenities.modal.extraBathroom" },
+    { key: "amenities.modal.privateBathroom" }, { key: "amenities.modal.toilet" }, { key: "amenities.modal.freeToiletries" },
+    { key: "amenities.modal.hairDryer" }, { key: "amenities.modal.shower" },
+  ]},
+  { categoryKey: "amenities.modal.cat.living", items: [{ key: "amenities.modal.diningArea" }, { key: "amenities.modal.sofa" }, { key: "amenities.modal.fireplace" }, { key: "amenities.modal.sittingArea" }, { key: "amenities.modal.workDesk" }] },
+  { categoryKey: "amenities.modal.cat.media", items: [{ key: "amenities.modal.flatScreenTV" }, { key: "amenities.modal.dvdPlayer" }, { key: "amenities.modal.radio" }, { key: "amenities.modal.tv" }] },
+  { categoryKey: "amenities.modal.cat.roomFeatures", items: [
+    { key: "amenities.modal.outletNearBed" }, { key: "amenities.modal.dryingRack" }, { key: "amenities.modal.mosquitoNet" },
+    { key: "amenities.modal.privateEntrance" }, { key: "amenities.modal.heating" }, { key: "amenities.modal.iron" },
+  ]},
+  { categoryKey: "amenities.modal.cat.accessibility", items: [{ key: "amenities.modal.groundFloor" }] },
+  { categoryKey: "amenities.modal.cat.outdoor", items: [
+    { key: "amenities.modal.beachfront" }, { key: "amenities.modal.outdoorDining" }, { key: "amenities.modal.outdoorFurniture" },
+    { key: "amenities.modal.veranda" }, { key: "amenities.modal.barbecue" }, { key: "amenities.modal.bbqFacilities" },
+    { key: "amenities.modal.garden" },
+  ]},
+  { categoryKey: "amenities.modal.cat.activities", items: [{ key: "amenities.modal.beach" }] },
+  { categoryKey: "amenities.modal.cat.views", items: [{ key: "amenities.modal.seaView" }, { key: "amenities.modal.view" }] },
+  { categoryKey: "amenities.modal.cat.building", items: [{ key: "amenities.modal.standalone" }] },
+  { categoryKey: "amenities.modal.cat.reception", items: [{ key: "amenities.modal.invoice" }] },
+  { categoryKey: "amenities.modal.cat.misc", items: [{ key: "amenities.modal.ac" }, { key: "amenities.modal.smokingBan" }] },
+  { categoryKey: "amenities.modal.cat.safety", items: [{ key: "amenities.modal.safe" }] },
+  { categoryKey: "amenities.modal.cat.languages", items: [{ key: "amenities.modal.langDe" }, { key: "amenities.modal.langEl" }, { key: "amenities.modal.langEn" }, { key: "amenities.modal.langFr" }] },
+];
+
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -263,6 +361,7 @@ export default function PropertyDetail() {
   const thumbScrollRef = useRef<HTMLDivElement>(null);
   const [videoHovered, setVideoHovered] = useState(false);
   const [videoStarted, setVideoStarted] = useState(false);
+  const [amenitiesModalOpen, setAmenitiesModalOpen] = useState(false);
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -897,6 +996,80 @@ export default function PropertyDetail() {
                             })}
                           </div>
                         </div>
+                        {hasAmenitiesModal(currentUnit?.name) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setAmenitiesModalOpen(true)}
+                              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl border-2 border-primary/40 bg-gradient-to-r from-primary/8 to-primary/5 text-primary font-semibold hover:from-primary hover:to-primary hover:text-primary-foreground hover:border-primary transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
+                            >
+                              <ListPlus size={20} strokeWidth={2} className="opacity-90" />
+                              {t("amenities.viewAllBtn")}
+                            </button>
+                            <Dialog open={amenitiesModalOpen} onOpenChange={setAmenitiesModalOpen}>
+                              <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0 overflow-hidden rounded-2xl border-2 border-primary/20 shadow-2xl shadow-primary/10">
+                                <DialogHeader className="relative px-8 pt-8 pb-6 pr-14 bg-gradient-to-br from-primary/10 via-primary/5 to-accent/5 border-b border-primary/10">
+                                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 to-transparent pointer-events-none" />
+                                  <div className="relative">
+                                    <div className="flex items-center gap-3 mb-1">
+                                      <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                                        <LayoutGrid size={22} className="text-primary" strokeWidth={2} />
+                                      </div>
+                                      <DialogTitle className="text-2xl font-bold text-foreground tracking-tight font-luxury">
+                                        {t("amenities.modal.title")}
+                                      </DialogTitle>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1 ml-[52px]">
+                                      {currentUnit?.name} · {t("property.amenities")}
+                                    </p>
+                                    <div className="h-px w-16 bg-gradient-to-r from-primary/50 to-transparent mt-4 ml-[52px]" />
+                                  </div>
+                                </DialogHeader>
+                                <ScrollArea className="flex-1" style={{ maxHeight: "calc(90vh - 140px)" }}>
+                                  <div className="p-6 sm:p-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {(isOgraHouse ? OGRA_AMENITIES_MODAL : LYKOSKUFI_AMENITIES_MODAL).map((cat, catIdx) => {
+                                        const CatIcon = (
+                                          { parking: Car, internet: Wifi, kitchen: Utensils, bedroom: Bed, bathroom: Bath,
+                                            living: Sofa, media: Tv, roomFeatures: LayoutGrid, pets: PawPrint,
+                                            outdoor: Mountain, activities: Waves, views: Mountain, building: Home,
+                                            reception: Users, misc: Wind, safety: Shield, languages: Globe,
+                                            accessibility: LayoutGrid
+                                          } as Record<string, React.ComponentType<{ size?: number; className?: string }>>
+                                        )[cat.categoryKey.replace("amenities.modal.cat.", "")] ?? LayoutGrid;
+                                        return (
+                                          <div
+                                            key={catIdx}
+                                            className="group rounded-xl border border-border/60 bg-card/50 p-5 hover:border-primary/20 hover:bg-primary/[0.03] hover:shadow-md transition-all duration-300"
+                                          >
+                                            <div className="flex items-center gap-3 mb-4">
+                                              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                                <CatIcon size={18} className="text-primary" strokeWidth={2} />
+                                              </div>
+                                              <h4 className="text-sm font-semibold text-foreground uppercase tracking-widest" style={{ letterSpacing: "0.12em" }}>
+                                                {t(cat.categoryKey)}
+                                              </h4>
+                                            </div>
+                                            <ul className="space-y-2.5">
+                                              {cat.items.map((item, itemIdx) => (
+                                                <li key={itemIdx} className="flex items-start gap-3">
+                                                  <CheckCircle2 size={16} className="text-primary/80 mt-0.5 flex-shrink-0" strokeWidth={2.5} />
+                                                  <span className="text-foreground/95 text-[15px] leading-relaxed">
+                                                    {t(item.key)}
+                                                  </span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </ScrollArea>
+                              </DialogContent>
+                            </Dialog>
+                          </>
+                        )}
                       </div>
                     );
                   })()}
