@@ -23,7 +23,7 @@ const replySchema = z.object({
 });
 
 const guestReplySchema = z.object({
-  guestEmail: z.string().email(),
+  guestEmail: z.string().trim().email(),
   message: z.string().min(1),
 });
 
@@ -128,7 +128,8 @@ router.get("/:id", async (req, res, next) => {
 router.post("/:id/guest-reply", validate(guestReplySchema), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { guestEmail, message } = req.body;
+    const guestEmail = String(req.body.guestEmail || "").trim();
+    const message = String(req.body.message || "").trim();
 
     const { data: inquiry } = await supabase
       .from("inquiries")

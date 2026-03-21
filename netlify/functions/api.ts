@@ -1703,7 +1703,8 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
           body: JSON.stringify({ success: false, error: 'Invalid JSON' })
         };
       }
-      const { guestEmail, message } = body;
+      const guestEmail = typeof body.guestEmail === 'string' ? body.guestEmail.trim() : '';
+      const message = typeof body.message === 'string' ? body.message.trim() : '';
       if (!guestEmail || !message) {
         return {
           statusCode: 400,

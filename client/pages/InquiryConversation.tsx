@@ -33,20 +33,22 @@ export default function InquiryConversation() {
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [manualEmail, setManualEmail] = useState("");
 
   const fetchConversation = async () => {
     try {
       const res = await fetch(apiUrl(`/api/inquiries/${id}?email=${encodeURIComponent(email)}`));
       if (!res.ok) {
-        setError("Inquiry not found or unauthorized");
+        setLoadError("Inquiry not found or unauthorized");
         return;
       }
       const data = await res.json();
       setInquiry(data.data.inquiry);
       setMessages(data.data.messages);
     } catch {
-      setError("Failed to load conversation");
+      setLoadError("Failed to load conversation");
     } finally {
       setLoading(false);
     }
@@ -56,22 +58,38 @@ export default function InquiryConversation() {
     if (id) fetchConversation();
   }, [id]);
 
+  const guestEmailToUse = (email || inquiry?.guest_email || manualEmail || "").trim();
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !id) return;
+    if (!guestEmailToUse) {
+      setSendError("Please enter your email address above to send messages.");
+      return;
+    }
     setSending(true);
+    setSendError(null);
     try {
       const res = await fetch(apiUrl(`/api/inquiries/${id}/guest-reply`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestEmail: email, message: newMessage.trim() }),
+        body: JSON.stringify({ guestEmail: guestEmailToUse, message: newMessage.trim() }),
       });
       if (res.ok) {
         setNewMessage("");
         fetchConversation();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const errMsg = data.details?.guestEmail
+          ? `Email: ${data.details.guestEmail}`
+          : data.error || "Failed to send reply";
+        setSendError(errMsg);
       }
-    } catch {}
-    finally { setSending(false); }
+    } catch {
+      setSendError("Failed to send reply");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (loading) {
@@ -84,11 +102,11 @@ export default function InquiryConversation() {
     );
   }
 
-  if (error || !inquiry) {
+  if (loadError || !inquiry) {
     return (
       <Layout>
         <div className="container-max py-20 text-center">
-          <p className="text-destructive">{error || "Inquiry not found"}</p>
+          <p className="text-destructive">{loadError || "Inquiry not found"}</p>
         </div>
       </Layout>
     );
@@ -130,15 +148,34 @@ export default function InquiryConversation() {
           ))}
         </div>
 
+        {!guestEmailToUse && (
+          <div className="mb-4 p-4 bg-muted/50 border border-border rounded-lg">
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Enter your email to reply (same email you used for this inquiry):
+            </label>
+            <input
+              type="email"
+              value={manualEmail}
+              onChange={(e) => { setManualEmail(e.target.value); setSendError(null); }}
+              placeholder="your@email.com"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+            />
+          </div>
+        )}
+        {sendError && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">
+            {sendError}
+          </div>
+        )}
         <form onSubmit={handleSend} className="flex gap-3">
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(e) => { setNewMessage(e.target.value); setSendError(null); }}
             placeholder="Type your message..."
             className="flex-1 px-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
           />
-          <button type="submit" disabled={sending || !newMessage.trim()}
+          <button type="submit" disabled={sending || !newMessage.trim() || !guestEmailToUse}
             className="btn-primary px-6 gap-2 disabled:opacity-50">
             <Send size={16} />
             Send
