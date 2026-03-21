@@ -50,6 +50,7 @@ export default function PropertyManagement() {
   const [selectedProperty, setSelectedProperty] = useState<string>("");
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
+  const [updatingUnit, setUpdatingUnit] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -233,65 +234,176 @@ export default function PropertyManagement() {
     }
   };
 
-  const fileToBase64 = (file: File): Promise<string> =>
+  const compressAndToBase64 = (file: File, maxW = 1200, quality = 0.85): Promise<string> =>
     new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement("canvas");
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW) {
+          h = Math.round((h * maxW) / w);
+          w = maxW;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result));
+          r.readAsDataURL(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              const r = new FileReader();
+              r.onload = () => resolve(String(r.result));
+              r.readAsDataURL(file);
+              return;
+            }
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result));
+            r.readAsDataURL(blob);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result));
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      };
+      img.src = url;
     });
 
   const handleUpdateUnit = async (formData: any) => {
-    if (!editingUnit) return;
+    console.log("[UPDATE UNIT] handleUpdateUnit called", {
+      editingUnit: editingUnit ? { id: editingUnit.id, name: editingUnit.name } : null,
+      hasFormData: !!formData,
+    });
+
+    if (!editingUnit) {
+      console.error("[UPDATE UNIT] ABORT: editingUnit is null/undefined");
+      return;
+    }
+
+    setUpdatingUnit(true);
+    const uploadUrl = apiUrl("/api/admin/upload-image");
+    const putUrl = apiUrl(`/api/admin/units/${editingUnit.id}`);
+    console.log("[UPDATE UNIT] API URLs", { uploadUrl, putUrl });
+
     try {
       const existing = formData.existingImages || [];
       let newUrls: string[] = [];
+      const files = formData.imageFiles || [];
 
-      for (const f of formData.imageFiles || []) {
-        const base64 = await fileToBase64(f);
-        const res = await fetch(apiUrl("/api/admin/upload-image"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            base64Data: base64,
-            filename: `unit-${editingUnit.id}-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`,
-          }),
+      console.log("[UPDATE UNIT] Step 1: Data", {
+        existingCount: existing.length,
+        newFilesCount: files.length,
+        existingSample: existing.slice(0, 2),
+      });
+
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i] as File;
+        console.log(`[UPDATE UNIT] Step 2a: Upload file ${i + 1}/${files.length}`, {
+          name: f.name,
+          size: f.size,
+          type: f.type,
         });
-        const json = await res.json();
-        if (json.success && json.imageUrl) newUrls.push(json.imageUrl);
+        try {
+          const base64 = await compressAndToBase64(f);
+          console.log(`[UPDATE UNIT] Step 2b: Compressed, base64 length=${base64?.length ?? 0}`);
+          const res = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              base64Data: base64,
+              filename: `unit-${editingUnit.id}-${Date.now()}-${i}-${Math.round(Math.random() * 1e6)}.jpg`,
+            }),
+          });
+          const json = await res.json();
+          console.log(`[UPDATE UNIT] Step 2c: Upload response ${i + 1}`, {
+            status: res.status,
+            ok: res.ok,
+            success: json.success,
+            imageUrl: json.imageUrl ? "yes" : "no",
+            error: json.error,
+          });
+          if (json.success && json.imageUrl) {
+            newUrls.push(json.imageUrl);
+          } else {
+            console.warn("[UPDATE UNIT] Upload failed for file", i, json);
+          }
+        } catch (e) {
+          console.warn("[UPDATE UNIT] Upload error for file", i, e);
+        }
       }
 
       const images = [...existing, ...newUrls];
+      const propId = formData.propertyId || editingUnit.propertyId || (editingUnit as any).property_id;
       const body = {
-        propertyId: formData.propertyId || editingUnit.propertyId,
-        name: formData.name,
-        description: formData.description || "",
-        maxGuests: formData.maxGuests,
-        bedrooms: formData.bedrooms,
-        bathrooms: formData.bathrooms,
-        basePrice: formData.basePrice,
-        cleaningFee: formData.cleaningFee,
-        minStayDays: formData.minStayDays,
+        propertyId: propId,
+        name: String(formData.name || "").trim(),
+        description: String(formData.description || "").trim(),
+        maxGuests: parseInt(String(formData.maxGuests), 10) || 2,
+        bedrooms: parseInt(String(formData.bedrooms), 10) || 1,
+        bathrooms: parseInt(String(formData.bathrooms), 10) || 1,
+        basePrice: parseFloat(String(formData.basePrice)) || 100,
+        cleaningFee: parseFloat(String(formData.cleaningFee)) || 0,
+        minStayDays: parseInt(String(formData.minStayDays), 10) || 1,
         images,
       };
 
-      const response = await fetch(apiUrl(`/api/admin/units/${editingUnit.id}`), {
+      const bodyStr = JSON.stringify(body);
+      console.log("[UPDATE UNIT] Step 3: Sending PUT", {
+        url: putUrl,
+        bodySize: bodyStr.length,
+        imagesCount: images.length,
+        propertyId: propId,
+      });
+
+      const response = await fetch(putUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: bodyStr,
       });
+
+      let responseData: any = {};
+      try {
+        const text = await response.text();
+        responseData = text ? JSON.parse(text) : {};
+      } catch {
+        responseData = { parseError: true };
+      }
+
+      console.log("[UPDATE UNIT] Step 4: PUT response", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        data: responseData,
+      });
+
       if (response.ok) {
+        console.log("[UPDATE UNIT] SUCCESS");
         setShowUnitForm(false);
         setEditingUnit(null);
         fetchData();
       } else {
-        const err = await response.json().catch(() => ({}));
-        console.error("Update unit failed:", err);
-        alert(err?.error || t("common.error"));
+        console.error("[UPDATE UNIT] FAILED:", responseData);
+        alert(responseData?.error || responseData?.message || t("common.error"));
       }
     } catch (error) {
-      console.error("Failed to update unit:", error);
+      console.error("[UPDATE UNIT] EXCEPTION:", error);
       alert(t("common.error"));
+    } finally {
+      setUpdatingUnit(false);
     }
   };
 
@@ -449,9 +561,10 @@ export default function PropertyManagement() {
       {showUnitForm && (
         <UnitForm
           unit={editingUnit}
-          propertyId={editingUnit?.propertyId || selectedProperty}
+          propertyId={editingUnit?.propertyId || (editingUnit as any)?.property_id || selectedProperty}
           properties={properties}
           onSubmit={editingUnit ? handleUpdateUnit : handleCreateUnit}
+          updating={updatingUnit}
           onClose={() => {
             setShowUnitForm(false);
             setEditingUnit(null);
@@ -579,7 +692,7 @@ function PropertyForm({ property, onSubmit, onClose }: any) {
 }
 
 // Unit Form Component
-function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyChange }: any) {
+function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyChange, updating = false }: any) {
   const { t } = useLanguage();
   const parseImages = (v: string | string[] | undefined): string[] => {
     if (!v) return [];
@@ -608,6 +721,16 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("[UNIT FORM] Submit clicked", {
+      isEdit: !!unit,
+      unitId: unit?.id,
+      formData: {
+        propertyId: formData.propertyId,
+        name: formData.name,
+        existingImagesCount: formData.existingImages?.length ?? 0,
+        imageFilesCount: formData.imageFiles?.length ?? 0,
+      },
+    });
     onSubmit(formData);
   };
 
@@ -840,10 +963,10 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             )}
           </div>
           <div className="flex gap-2 pt-4">
-            <button type="submit" className="btn-primary">
-              {unit ? t("admin.updateUnit") : t("admin.createUnit")}
+            <button type="submit" className="btn-primary" disabled={updating}>
+              {updating ? t("common.loading") : (unit ? t("admin.updateUnit") : t("admin.createUnit"))}
             </button>
-            <button type="button" onClick={onClose} className="btn-secondary">
+            <button type="button" onClick={onClose} className="btn-secondary" disabled={updating}>
               {t("common.cancel")}
             </button>
           </div>

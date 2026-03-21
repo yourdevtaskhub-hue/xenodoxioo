@@ -1017,10 +1017,21 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
     // PUT /api/admin/units/:id
     if (path.startsWith('/api/admin/units/') && method === 'PUT') {
       const id = path.split('/').pop();
-      const body = JSON.parse(event.body || '{}');
-      
-      console.log(`🔍 [${requestId}] Updating unit: ${id}`);
-      console.log(`🔍 [${requestId}] Update data:`, body);
+      console.log(`🔍 [${requestId}] PUT /api/admin/units/:id — id=${id}, isBase64Encoded=${event.isBase64Encoded}, bodyLength=${(event.body || '').length}`);
+
+      let body: any = {};
+      try {
+        const rawBody = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '{}');
+        body = JSON.parse(rawBody);
+        console.log(`✅ [${requestId}] Parsed body: propertyId=${body.propertyId}, name=${body.name}, imagesCount=${body.images?.length ?? 0}`);
+      } catch (parseErr: any) {
+        console.error(`❌ [${requestId}] Body parse error:`, parseErr?.message);
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON body', detail: parseErr?.message })
+        };
+      }
       
       // Transform the data for database
       const updateData: any = {
@@ -1346,8 +1357,17 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
     // POST /api/admin/upload-image
     if (path === '/api/admin/upload-image' && method === 'POST') {
       console.log(`🖼️ [${requestId}] === IMAGE UPLOAD START ===`);
+      console.log(`🖼️ [${requestId}] isBase64Encoded=${event.isBase64Encoded}, bodyLength=${(event.body || '').length}`);
       try {
-        const body = JSON.parse(event.body || '{}');
+        let rawBody: string;
+        try {
+          rawBody = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : (event.body || '{}');
+        } catch (e: any) {
+          console.error(`❌ [${requestId}] Body decode error:`, e?.message);
+          throw e;
+        }
+        const body = JSON.parse(rawBody);
+        console.log(`🖼️ [${requestId}] Parsed: hasBase64=${!!body.base64Data}, base64Len=${body.base64Data?.length ?? 0}, filename=${body.filename}`);
         console.log(`📝 [${requestId}] Upload payload:`, JSON.stringify(body, null, 2));
         
         const { base64Data, filename } = body;
