@@ -45,6 +45,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
+import { getUnitBedTagKey } from "@/lib/room-display-order";
 import formatCurrency from "@/lib/currency";
 import { getTieredPricePerNight } from "@/lib/price-tiers";
 import { Send, MessageSquare } from "lucide-react";
@@ -740,10 +741,15 @@ export default function PropertyDetail() {
                 <Users size={20} className="text-primary shrink-0" />
                 <span>{t("property.quickInfo.guests").replace("{n}", String(effectiveMaxGuests))}</span>
               </div>
-              <div className="flex items-center gap-2 text-foreground font-medium">
-                <Bed size={20} className="text-primary shrink-0" />
-                <span>{t("property.quickInfo.bedrooms").replace("{n}", String(currentUnit.bedrooms))}</span>
-              </div>
+              {(() => {
+                const bedTagKey = getUnitBedTagKey(data.name, currentUnit.name);
+                return (
+                  <div className="flex items-center gap-2 text-foreground font-medium">
+                    <Bed size={20} className="text-primary shrink-0" />
+                    <span>{bedTagKey ? t(bedTagKey) : t("property.quickInfo.bedrooms").replace("{n}", String(currentUnit.bedrooms))}</span>
+                  </div>
+                );
+              })()}
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Bath size={20} className="text-primary shrink-0" />
                 <span>{t("property.quickInfo.bathrooms").replace("{n}", String(currentUnit.bathrooms))}</span>
@@ -780,12 +786,12 @@ export default function PropertyDetail() {
               <>
                 {/* Header & Experience Description */}
                 <div className="mb-10">
-                  <p className="text-sm text-muted-foreground uppercase tracking-wide mb-1">
-                    {data.name}
-                  </p>
-                  <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
+                  <h1 className={`text-3xl md:text-4xl font-bold text-foreground ${/small\s*bungalow/i.test(currentUnit.name) ? "mb-0" : "mb-6"}`}>
                     {currentUnit.name}
                   </h1>
+                  {/small\s*bungalow/i.test(currentUnit.name) && (
+                    <p className="text-muted-foreground text-sm mt-1 mb-6">Studio</p>
+                  )}
 
                   {/* Description — from system translations (not admin panel) */}
                   <div className="space-y-5">
@@ -1268,6 +1274,9 @@ export default function PropertyDetail() {
                 <>
                   <div className="mb-6">
                     <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-muted-foreground text-lg">
+                        {t("property.priceFrom")}{" "}
+                      </span>
                       <span className="text-3xl font-bold text-primary">
                         {quoteLoading
                           ? "..."

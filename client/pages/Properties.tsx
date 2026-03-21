@@ -1,7 +1,8 @@
 import Layout from "@/components/Layout";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
+import { sortByRoomOrder, getUnitBedTagKey } from "@/lib/room-display-order";
 import { Link, useSearchParams } from "react-router-dom";
-import { MapPin, Users, Bed, Bath } from "lucide-react";
+import { Users, Bed, Bath } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -101,7 +102,7 @@ export default function Properties() {
             });
           }
         });
-        setUnits(mapped);
+        setUnits(sortByRoomOrder(mapped));
       } catch (error) {
         console.error("❌ [CLIENT] Error loading properties", error);
         setUnitsError("Unable to load properties right now.");
@@ -295,21 +296,34 @@ export default function Properties() {
                       <div>
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              {unit.property?.name}
-                              {unit.property && (
-                                <>
-                                  {" · "}
-                                  <MapPin size={14} className="text-primary" />
-                                  <span>
-                                    {unit.property.city}, {unit.property.country}
-                                  </span>
-                                </>
-                              )}
-                            </p>
                             <h3 className="text-xl font-bold text-foreground">
                               {unit.name}
                             </h3>
+                            {/small\s*bungalow/i.test(unit.name) && (
+                              <p className="text-sm text-muted-foreground mt-0.5">
+                                Studio
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-4 mt-2 text-sm">
+                              <div className="flex items-center gap-2 text-foreground">
+                                <Bed size={16} className="text-primary" />
+                                {(() => {
+                                  const bedTagKey = getUnitBedTagKey(unit.property?.name ?? "", unit.name);
+                                  return bedTagKey ? t(bedTagKey) : `${unit.bedrooms} ${unit.bedrooms === 1 ? t("common.bedroom") : t("common.bedrooms")}`;
+                                })()}
+                              </div>
+                              <div className="flex items-center gap-2 text-foreground">
+                                <Bath size={16} className="text-primary" />
+                                {unit.bathrooms}{" "}
+                                {unit.bathrooms === 1
+                                  ? t("common.bathroom")
+                                  : t("common.bathrooms")}
+                              </div>
+                              <div className="flex items-center gap-2 text-foreground">
+                                <Users size={16} className="text-primary" />
+                                {unit.maxGuests} {t("common.guests")}
+                              </div>
+                            </div>
                           </div>
                           <div className="text-right">
                             {unit.closedForCurrentPeriod && (
@@ -330,10 +344,10 @@ export default function Properties() {
                               </div>
                             )}
                             <div className="text-2xl font-bold text-primary">
-                              {formatCurrency(unit.basePrice, language)}
+                              {t("property.priceFrom")} {formatCurrency(unit.basePrice, language)}
                             </div>
                             <p className="text-muted-foreground text-sm">
-                              per night
+                              {t("common.perNight")}
                             </p>
                           </div>
                         </div>
@@ -343,28 +357,6 @@ export default function Properties() {
                             {unit.description}
                           </p>
                         )}
-
-                        {/* Details */}
-                        <div className="flex flex-wrap gap-4 mb-4 text-sm">
-                          <div className="flex items-center gap-2 text-foreground">
-                            <Bed size={16} className="text-primary" />
-                            {unit.bedrooms}{" "}
-                            {unit.bedrooms === 1
-                              ? t("common.bedroom")
-                              : t("common.bedrooms")}
-                          </div>
-                          <div className="flex items-center gap-2 text-foreground">
-                            <Bath size={16} className="text-primary" />
-                            {unit.bathrooms}{" "}
-                            {unit.bathrooms === 1
-                              ? t("common.bathroom")
-                              : t("common.bathrooms")}
-                          </div>
-                          <div className="flex items-center gap-2 text-foreground">
-                            <Users size={16} className="text-primary" />
-                            {unit.maxGuests} {t("common.guests")}
-                          </div>
-                        </div>
                       </div>
 
                       {/* CTA */}
