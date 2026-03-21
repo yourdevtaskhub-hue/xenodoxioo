@@ -339,6 +339,42 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
+    // GET /api/bookings/occupied-dates - blocked dates for calendar (CRITICAL: prevents double booking)
+    if ((path === '/api/bookings/occupied-dates' || path === '/bookings/occupied-dates') && method === 'GET') {
+      const unitId = event.queryStringParameters?.unitId?.trim();
+      if (!unitId) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'unitId required' })
+        };
+      }
+      const BLOCKING_STATUSES = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
+      const { data: ranges, error } = await supabase
+        .from('bookings')
+        .select('check_in_date, check_out_date')
+        .eq('unit_id', unitId)
+        .in('status', BLOCKING_STATUSES)
+        .order('check_in_date', { ascending: true });
+
+      if (error) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: error.message })
+        };
+      }
+      const mapped = (ranges || []).map((r: { check_in_date: string; check_out_date: string }) => ({
+        start: (r.check_in_date || '').slice(0, 10),
+        end: (r.check_out_date || '').slice(0, 10),
+      }));
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: mapped })
+      };
+    }
+
     // POST /api/bookings/quote - pricing quote for checkout
     if ((path === '/api/bookings/quote' || path === '/bookings/quote') && method === 'POST') {
       try {
@@ -497,6 +533,27 @@ export const handler = async (event: any, context: any) => {
             body: JSON.stringify({
               success: false,
               message: `Maximum ${maxGuests} guests allowed for this room`
+            })
+          };
+        }
+
+        // CRITICAL: Check availability - prevent double booking
+        const BLOCKING_STATUSES = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
+        const { data: conflicting } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('unit_id', body.unitId)
+          .in('status', BLOCKING_STATUSES)
+          .lt('check_in_date', body.checkOutDate)
+          .gt('check_out_date', body.checkInDate);
+        if (conflicting && conflicting.length > 0) {
+          return {
+            statusCode: 409,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              message: 'Dates are already booked',
+              error: 'Dates are already booked'
             })
           };
         }
