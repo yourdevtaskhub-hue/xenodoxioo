@@ -98,6 +98,11 @@ export const handler = async (event: any) => {
           const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
           const unit = fullBooking.unit as any;
           const property = unit?.property;
+          const GUEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+          const isGuest = !fullBooking.user_id || fullBooking.user_id === GUEST_USER_ID;
+          const viewBookingUrl = isGuest
+            ? `${frontendUrl}/booking/${fullBooking.id}?email=${encodeURIComponent(fullBooking.guest_email || "")}`
+            : `${frontendUrl}/dashboard`;
 
           try {
             await resend.emails.send({
@@ -112,7 +117,7 @@ export const handler = async (event: any) => {
                   <li><strong>Booking:</strong> ${fullBooking.booking_number}</li>
                   <li><strong>Amount:</strong> €${Number(payment.amount).toFixed(2)}</li>
                 </ul>
-                <a href="${frontendUrl}/dashboard" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a>
+                <a href="${viewBookingUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a>
                 <p>Best regards,<br/>LEONIDIONHOUSES</p>
               `,
             });
@@ -122,31 +127,30 @@ export const handler = async (event: any) => {
               : null;
             const cancelSection = cancelLink
               ? `
-                <p>Αν επιθυμείτε να ακυρώσετε την κράτησή σας, μπορείτε να το κάνετε πατώντας στον παρακάτω σύνδεσμο:</p>
-                <p><a href="${cancelLink}" style="background:#dc2626;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Ακύρωση κράτησης</a></p>
-                <p><strong>Σημαντικό:</strong> Πριν την ακύρωση, θα σας εμφανιστούν οι όροι και θα ζητηθεί επιβεβαίωση.</p>
-                <p>Ο σύνδεσμος είναι προσωπικός και αφορά μόνο τη συγκεκριμένη κράτηση.</p>
+                <p>If you wish to cancel your booking, you can do so by clicking the link below:</p>
+                <p><a href="${cancelLink}" style="background:#dc2626;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Cancel Booking</a></p>
+                <p><strong>Important:</strong> Before cancelling, you will see the terms and be asked to confirm. This link is personal and applies only to this specific booking.</p>
               `
               : "";
 
             await resend.emails.send({
               from,
               to: fullBooking.guest_email,
-              subject: "Επιβεβαίωση κράτησης",
+              subject: "Booking Confirmation",
               html: `
-                <h1>Επιβεβαίωση κράτησης</h1>
-                <p>Καλημέρα ${fullBooking.guest_name},</p>
-                <p>Σας ευχαριστούμε για την κράτησή σας.</p>
+                <h1>Booking Confirmation</h1>
+                <p>Dear ${fullBooking.guest_name},</p>
+                <p>Thank you for your booking.</p>
                 <ul>
-                  <li><strong>Κράτηση:</strong> ${fullBooking.booking_number}</li>
-                  <li><strong>Δωμάτιο:</strong> ${property?.name || unit?.name || "N/A"}</li>
-                  <li><strong>Άφιξη:</strong> ${new Date(fullBooking.check_in_date).toLocaleDateString("el-GR")}</li>
-                  <li><strong>Αναχώρηση:</strong> ${new Date(fullBooking.check_out_date).toLocaleDateString("el-GR")}</li>
-                  <li><strong>Σύνολο:</strong> €${Number(fullBooking.total_price).toFixed(2)}</li>
+                  <li><strong>Booking:</strong> ${fullBooking.booking_number}</li>
+                  <li><strong>Room:</strong> ${property?.name || unit?.name || "N/A"}</li>
+                  <li><strong>Arrival:</strong> ${new Date(fullBooking.check_in_date).toLocaleDateString("en-GB")}</li>
+                  <li><strong>Departure:</strong> ${new Date(fullBooking.check_out_date).toLocaleDateString("en-GB")}</li>
+                  <li><strong>Total:</strong> €${Number(fullBooking.total_price).toFixed(2)}</li>
                 </ul>
                 ${cancelSection}
-                <p><a href="${frontendUrl}/dashboard" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Προβολή κράτησης</a></p>
-                <p>Με εκτίμηση,<br/>LEONIDIONHOUSES</p>
+                <p><a href="${viewBookingUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p>
+                <p>Best regards,<br/>LEONIDIONHOUSES</p>
               `,
             });
           } catch (emailErr: any) {

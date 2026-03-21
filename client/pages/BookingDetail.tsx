@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { apiUrl } from "@/lib/api";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -30,7 +30,8 @@ type BookingData = {
 
 export default function BookingDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const emailParam = searchParams.get("email")?.trim() || "";
   const { t, language } = useLanguage();
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,23 +45,16 @@ export default function BookingDetail() {
     }
 
     const rawAuth = localStorage.getItem("auth");
-    if (!rawAuth) {
-      setError("auth_required");
-      setLoading(false);
-      return;
-    }
-
     let accessToken: string | null = null;
-    try {
-      const parsed = JSON.parse(rawAuth);
-      accessToken = parsed.accessToken;
-    } catch {
-      setError("auth_required");
-      setLoading(false);
-      return;
+    if (rawAuth) {
+      try {
+        const parsed = JSON.parse(rawAuth);
+        accessToken = parsed.accessToken;
+      } catch { /* invalid */ }
     }
 
-    if (!accessToken) {
+    // Guest access: ?email= required when no auth
+    if (!accessToken && !emailParam) {
       setError("auth_required");
       setLoading(false);
       return;
@@ -70,8 +64,11 @@ export default function BookingDetail() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(apiUrl(`/api/bookings/${id}`), {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        const url = accessToken
+          ? apiUrl(`/api/bookings/${id}`)
+          : apiUrl(`/api/bookings/${id}?email=${encodeURIComponent(emailParam)}`);
+        const response = await fetch(url, {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
         });
         const json = await response.json().catch(() => ({}));
 
@@ -108,7 +105,7 @@ export default function BookingDetail() {
     };
 
     fetchBooking();
-  }, [id]);
+  }, [id, emailParam]);
 
   if (loading) {
     return (
@@ -169,15 +166,17 @@ export default function BookingDetail() {
   const propertyName = booking.unit?.property?.name ?? "";
   const unitName = booking.unit?.name ?? "";
 
+  const isGuestView = !localStorage.getItem("auth") && !!emailParam;
+
   return (
     <Layout>
       <div className="container-max section-padding min-h-screen">
         <div className="max-w-2xl mx-auto">
           <Link
-            to="/dashboard"
+            to={isGuestView ? "/properties" : "/dashboard"}
             className="inline-flex items-center text-primary hover:underline mb-6"
           >
-            ← {t("dashboard.backToBookings")}
+            ← {isGuestView ? (t("common.back") || "Πίσω") : t("dashboard.backToBookings")}
           </Link>
 
           <div className="bg-card border border-border rounded-xl p-6 shadow-sm">

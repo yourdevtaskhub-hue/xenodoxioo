@@ -126,6 +126,17 @@ export async function sendWelcomeEmail(
   });
 }
 
+const GUEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+function getViewBookingUrl(booking: any, userId?: string | null, guestEmail?: string): string {
+  const base = getFrontendUrl();
+  const isGuest = !userId || userId === GUEST_USER_ID;
+  if (isGuest && guestEmail && booking?.id) {
+    return `${base}/booking/${booking.id}?email=${encodeURIComponent(guestEmail)}`;
+  }
+  return `${base}/dashboard`;
+}
+
 /**
  * Booking confirmation email
  */
@@ -134,6 +145,7 @@ export async function sendBookingConfirmationEmail(
   booking: any,
   userId?: string,
 ) {
+  const viewUrl = getViewBookingUrl(booking, userId, email);
   const html = `
     <h1>Booking Confirmation</h1>
     <p>Dear ${booking.guestName},</p>
@@ -151,7 +163,7 @@ export async function sendBookingConfirmationEmail(
     <h2>Total Amount: €${booking.totalPrice?.toFixed(2) || '0.00'}</h2>
     <p><strong>Deposit (25%):</strong> €${((booking.totalPrice || 0) * 0.25).toFixed(2)} (Due immediately)</p>
     <p><strong>Balance (75%):</strong> €${((booking.totalPrice || 0) * 0.75).toFixed(2)} (Due 21 days before arrival)</p>
-    <a href="${getFrontendUrl()}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
+    <a href="${viewUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -174,6 +186,7 @@ export async function sendPaymentReceiptEmail(
   payment: any,
   userId?: string,
 ) {
+  const viewUrl = getViewBookingUrl(booking, userId, email);
   const paymentTypeText =
     payment.paymentType === "DEPOSIT"
       ? "Deposit (25%)"
@@ -194,7 +207,7 @@ export async function sendPaymentReceiptEmail(
       <li><strong>Transaction ID:</strong> ${payment.stripeChargeId || "N/A"}</li>
     </ul>
     <p>Thank you for your payment!</p>
-    <a href="${getFrontendUrl()}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
+    <a href="${viewUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
@@ -244,6 +257,7 @@ export async function sendArrivalReminderEmail(
   booking: any,
   userId?: string,
 ) {
+  const viewUrl = getViewBookingUrl(booking, userId, email);
   const checkInDate = new Date(booking.checkInDate).toLocaleDateString();
 
   const html = `
@@ -258,7 +272,7 @@ export async function sendArrivalReminderEmail(
       <li><strong>Check-in Time:</strong> 3:00 PM (or by arrangement)</li>
     </ul>
     <p>Please ensure you have the necessary documents and contact information saved.</p>
-    <a href="${getFrontendUrl()}/dashboard" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking Details</a>
+    <a href="${viewUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Booking Details</a>
     <p>If you have any questions, please don't hesitate to contact us.</p>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;

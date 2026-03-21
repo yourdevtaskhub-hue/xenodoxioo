@@ -149,6 +149,10 @@ async function processSuccessfulPayment(
   if (apiKey) {
     const resend = new Resend(apiKey);
     const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`;
+    const isGuest = !booking.user_id || booking.user_id === GUEST_USER_ID;
+    const viewBookingUrl = isGuest
+      ? `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || "")}`
+      : `${frontendUrl}/dashboard`;
 
     await resend.emails.send({
       from,
@@ -162,7 +166,7 @@ async function processSuccessfulPayment(
           <li><strong>Booking:</strong> ${bookingForEmail.bookingNumber}</li>
           <li><strong>Amount:</strong> €${payment.amount?.toFixed(2)}</li>
         </ul>
-        <a href="${frontendUrl}/dashboard" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a>
+        <a href="${viewBookingUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a>
         <p>Best regards,<br/>LEONIDIONHOUSES</p>
       `,
     });
@@ -173,31 +177,30 @@ async function processSuccessfulPayment(
         : null;
       const cancelSection = cancelLink
         ? `
-          <p>Αν επιθυμείτε να ακυρώσετε την κράτησή σας, μπορείτε να το κάνετε πατώντας στον παρακάτω σύνδεσμο:</p>
-          <p><a href="${cancelLink}" style="background:#dc2626;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Ακύρωση κράτησης</a></p>
-          <p><strong>Σημαντικό:</strong> Πριν την ακύρωση, θα σας εμφανιστούν οι όροι και θα ζητηθεί επιβεβαίωση.</p>
-          <p>Ο σύνδεσμος είναι προσωπικός και αφορά μόνο τη συγκεκριμένη κράτηση.</p>
+          <p>If you wish to cancel your booking, you can do so by clicking the link below:</p>
+          <p><a href="${cancelLink}" style="background:#dc2626;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Cancel Booking</a></p>
+          <p><strong>Important:</strong> Before cancelling, you will see the terms and be asked to confirm. This link is personal and applies only to this specific booking.</p>
         `
         : "";
 
       await resend.emails.send({
         from,
         to: booking.guest_email,
-        subject: "Επιβεβαίωση κράτησης",
+        subject: "Booking Confirmation",
         html: `
-          <h1>Επιβεβαίωση κράτησης</h1>
-          <p>Καλημέρα ${bookingForEmail.guestName},</p>
-          <p>Σας ευχαριστούμε για την κράτησή σας.</p>
+          <h1>Booking Confirmation</h1>
+          <p>Dear ${bookingForEmail.guestName},</p>
+          <p>Thank you for your booking.</p>
           <ul>
-            <li><strong>Κράτηση:</strong> ${bookingForEmail.bookingNumber}</li>
-            <li><strong>Δωμάτιο:</strong> ${bookingForEmail.unit?.property?.name}</li>
-            <li><strong>Άφιξη:</strong> ${new Date(bookingForEmail.checkInDate).toLocaleDateString("el-GR")}</li>
-            <li><strong>Αναχώρηση:</strong> ${new Date(bookingForEmail.checkOutDate).toLocaleDateString("el-GR")}</li>
-            <li><strong>Σύνολο:</strong> €${bookingForEmail.totalPrice?.toFixed(2)}</li>
+            <li><strong>Booking:</strong> ${bookingForEmail.bookingNumber}</li>
+            <li><strong>Room:</strong> ${bookingForEmail.unit?.property?.name}</li>
+            <li><strong>Arrival:</strong> ${new Date(bookingForEmail.checkInDate).toLocaleDateString("en-GB")}</li>
+            <li><strong>Departure:</strong> ${new Date(bookingForEmail.checkOutDate).toLocaleDateString("en-GB")}</li>
+            <li><strong>Total:</strong> €${bookingForEmail.totalPrice?.toFixed(2)}</li>
           </ul>
           ${cancelSection}
-          <p><a href="${frontendUrl}/dashboard" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">Προβολή κράτησης</a></p>
-          <p>Με εκτίμηση,<br/>LEONIDIONHOUSES</p>
+          <p><a href="${viewBookingUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p>
+          <p>Best regards,<br/>LEONIDIONHOUSES</p>
         `,
       });
     }
