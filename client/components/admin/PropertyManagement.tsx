@@ -233,34 +233,65 @@ export default function PropertyManagement() {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleUpdateUnit = async (formData: any) => {
     if (!editingUnit) return;
     try {
-      const fd = new FormData();
-      fd.append("propertyId", formData.propertyId || editingUnit.propertyId);
-      fd.append("name", formData.name);
-      fd.append("description", formData.description || "");
-      fd.append("maxGuests", String(formData.maxGuests));
-      fd.append("bedrooms", String(formData.bedrooms));
-      fd.append("bathrooms", String(formData.bathrooms));
-      fd.append("basePrice", String(formData.basePrice));
-      fd.append("cleaningFee", String(formData.cleaningFee));
-      fd.append("minStayDays", String(formData.minStayDays));
       const existing = formData.existingImages || [];
-      fd.append("existingImages", JSON.stringify(existing));
-      (formData.imageFiles || []).forEach((f: File) => fd.append("images", f));
+      let newUrls: string[] = [];
+
+      for (const f of formData.imageFiles || []) {
+        const base64 = await fileToBase64(f);
+        const res = await fetch(apiUrl("/api/admin/upload-image"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64Data: base64,
+            filename: `unit-${editingUnit.id}-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`,
+          }),
+        });
+        const json = await res.json();
+        if (json.success && json.imageUrl) newUrls.push(json.imageUrl);
+      }
+
+      const images = [...existing, ...newUrls];
+      const body = {
+        propertyId: formData.propertyId || editingUnit.propertyId,
+        name: formData.name,
+        description: formData.description || "",
+        maxGuests: formData.maxGuests,
+        bedrooms: formData.bedrooms,
+        bathrooms: formData.bathrooms,
+        basePrice: formData.basePrice,
+        cleaningFee: formData.cleaningFee,
+        minStayDays: formData.minStayDays,
+        images,
+      };
 
       const response = await fetch(apiUrl(`/api/admin/units/${editingUnit.id}`), {
         method: "PUT",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
       if (response.ok) {
         setShowUnitForm(false);
         setEditingUnit(null);
         fetchData();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        console.error("Update unit failed:", err);
+        alert(err?.error || t("common.error"));
       }
     } catch (error) {
       console.error("Failed to update unit:", error);
+      alert(t("common.error"));
     }
   };
 

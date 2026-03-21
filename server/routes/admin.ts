@@ -1243,7 +1243,6 @@ router.put("/units/:id", upload.any(), async (req, res) => {
     console.log("🔍 [UNITS] Request body:", req.body);
     console.log("🔍 [UNITS] Request files:", req.files);
     
-    // Parse FormData
     const updateData: any = {};
     
     // Handle form fields
@@ -1257,49 +1256,37 @@ router.put("/units/:id", upload.any(), async (req, res) => {
     if (req.body.cleaningFee) updateData.cleaning_fee = parseFloat(req.body.cleaningFee);
     if (req.body.minStayDays) updateData.min_stay_days = parseInt(req.body.minStayDays);
     
-    // Handle existing images
-    let existingImages = [];
-    if (req.body.existingImages) {
-      try {
-        existingImages = JSON.parse(req.body.existingImages);
-      } catch (e) {
-        console.error("❌ Failed to parse existingImages:", e);
-      }
-    }
+    let allImages: string[];
     
-    // Handle new image uploads
-    const uploadedImages = [];
-    if (req.files && Array.isArray(req.files)) {
-      console.log("🔍 [UNITS] Processing uploaded files for update:", req.files.map(f => ({ 
-        fieldname: f.fieldname, 
-        originalname: f.originalname, 
-        filename: f.filename 
-      })));
-      
-      for (const file of req.files) {
-        // Handle both 'images' field name and any image files
-        if (file.fieldname === 'images' || file.mimetype?.startsWith('image/')) {
-          if (file.filename) {
-            uploadedImages.push(`/uploads/${file.filename}`);
-            console.log("✅ [UNITS] Added update image:", `/uploads/${file.filename}`);
-          } else {
-            console.error("❌ [UNITS] Update file has no filename:", file);
-          }
+    if (Array.isArray(req.body.images)) {
+      // JSON body (Netlify/compat flow): images array already provided
+      allImages = req.body.images;
+      console.log("🔍 [UNITS] Using images from JSON body:", allImages.length);
+    } else {
+      // FormData (multer): existingImages + uploaded files
+      let existingImages: string[] = [];
+      if (req.body.existingImages) {
+        try {
+          existingImages = JSON.parse(req.body.existingImages);
+        } catch (e) {
+          console.error("❌ Failed to parse existingImages:", e);
         }
       }
-    } else if (req.files && !Array.isArray(req.files)) {
-      // Handle single file case
-      const file = req.files as any;
-      if (file.filename && (file.fieldname === 'images' || file.mimetype?.startsWith('image/'))) {
-        uploadedImages.push(`/uploads/${file.filename}`);
-        console.log("✅ [UNITS] Added single update image:", `/uploads/${file.filename}`);
+      const uploadedImages: string[] = [];
+      if (req.files && Array.isArray(req.files)) {
+        for (const file of req.files) {
+          if (file.fieldname === 'images' || file.mimetype?.startsWith('image/')) {
+            if (file.filename) uploadedImages.push(`/uploads/${file.filename}`);
+          }
+        }
+      } else if (req.files && !Array.isArray(req.files)) {
+        const file = req.files as any;
+        if (file.filename && (file.fieldname === 'images' || file.mimetype?.startsWith('image/'))) {
+          uploadedImages.push(`/uploads/${file.filename}`);
+        }
       }
+      allImages = [...existingImages, ...uploadedImages];
     }
-    
-    console.log("🔍 [UNITS] Total uploaded images for update:", uploadedImages);
-    
-    // Combine existing and new images
-    const allImages = [...existingImages, ...uploadedImages];
     
     // Handle images field properly for database
     if (allImages.length > 0) {
