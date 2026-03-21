@@ -64,6 +64,23 @@ async function processOfferPayment(
   paymentIntentId: string,
   chargeId?: string
 ) {
+  // Ensure guest user exists (required for payments FK)
+  const { error: guestErr } = await supabase.from("users").upsert(
+    {
+      id: GUEST_USER_ID,
+      email: "guest-system@leonidion-houses.com",
+      first_name: "Guest",
+      last_name: "User",
+      password: "no-login-placeholder",
+      role: "CUSTOMER",
+      status: "INACTIVE",
+    },
+    { onConflict: "id" }
+  );
+  if (guestErr) {
+    console.warn("[WEBHOOK] Guest user upsert failed (may already exist):", guestErr.message);
+  }
+
   const { data: pending } = await supabase
     .from("pending_offer_checkouts")
     .select("*")
@@ -136,10 +153,11 @@ async function processOfferPayment(
 
   if (bookErr || !booking) {
     console.error("[WEBHOOK] Failed to create booking from offer:", bookErr);
-    return;
+    throw new Error(`Booking insert failed: ${bookErr?.message || "unknown"}`);
   }
+  console.log("[WEBHOOK] Offer booking created:", bookingNumber, booking.id);
 
-  await supabase.from("payments").insert({
+  const { error: payErr } = await supabase.from("payments").insert({
     booking_id: booking.id,
     user_id: GUEST_USER_ID,
     amount: customTotal,
@@ -151,6 +169,10 @@ async function processOfferPayment(
     processed_at: new Date().toISOString(),
     description: `Full payment (custom offer) for ${bookingNumber}`,
   });
+  if (payErr) {
+    console.error("[WEBHOOK] Payments insert failed — run scripts/add-custom-checkout-offers.sql in Supabase:", payErr);
+    throw new Error(`Payments insert failed: ${payErr.message}. Ensure guest user exists.`);
+  }
 
   await supabase
     .from("bookings")
