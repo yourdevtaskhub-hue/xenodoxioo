@@ -1,3 +1,13 @@
+/** Effective max guests per unit. Small/Big Bungalow & Lykoskufi 1 = 3, Lykoskufi 2 = 5, others from DB. */
+function getEffectiveMaxGuests(unitName: string, dbMaxGuests: number): number {
+  const u = (unitName || "").toLowerCase().trim().replace(/\s+/g, " ");
+  if (/small\s*bungalow/i.test(u)) return 3;
+  if ((/big\s*bungalow|μεγάλο|megalo/i.test(u)) && /bungalow/i.test(u)) return 3;
+  if (/lykoskufi\s*1|lykoskufi1|lykoski\s*1/i.test(u)) return 3;
+  if (/lykoskufi\s*2|lykoskufi2|lykoski\s*2/i.test(u)) return 5;
+  return dbMaxGuests ?? 10;
+}
+
 // Main API function - simple Supabase connection without express
 export const handler = async (event: any, context: any) => {
   const requestId = Math.random().toString(36).substr(2, 9);
@@ -357,6 +367,17 @@ export const handler = async (event: any, context: any) => {
             body: JSON.stringify({ success: false, error: 'Unit not found' })
           };
         }
+        const maxGuests = getEffectiveMaxGuests(unit.name, unit.max_guests ?? 10);
+        if (guests > maxGuests) {
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              error: `Maximum ${maxGuests} guests allowed for this room`
+            })
+          };
+        }
         const basePrice = Number(unit.base_price) || 0;
         const cleaningFee = Number(unit.cleaning_fee) || 0;
         let subtotal = basePrice * nights;
@@ -453,6 +474,19 @@ export const handler = async (event: any, context: any) => {
             body: JSON.stringify({
               success: false,
               message: 'Unit not found'
+            })
+          };
+        }
+
+        const maxGuests = getEffectiveMaxGuests(unit.name, unit.max_guests ?? 10);
+        const requestedGuests = parseInt(body.guests) || 1;
+        if (requestedGuests > maxGuests) {
+          return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              message: `Maximum ${maxGuests} guests allowed for this room`
             })
           };
         }

@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import AvailabilityCalendar from "@/components/AvailabilityCalendar";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   Bed,
   Bath,
@@ -45,7 +45,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
-import { getUnitBedTagKey } from "@/lib/room-display-order";
+import { getUnitBedTagKey, getMaxGuestsForUnit } from "@/lib/room-display-order";
 import formatCurrency from "@/lib/currency";
 import { getTieredPricePerNight } from "@/lib/price-tiers";
 import { Send, MessageSquare } from "lucide-react";
@@ -345,6 +345,7 @@ const OGRA_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key: str
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedUnitIndex, setSelectedUnitIndex] = useState(0);
@@ -352,7 +353,8 @@ export default function PropertyDetail() {
     checkIn: Date;
     checkOut: Date;
   } | null>(null);
-  const [selectedGuests, setSelectedGuests] = useState(2);
+  const initialGuests = parseInt(searchParams.get("guests") || "2", 10) || 2;
+  const [selectedGuests, setSelectedGuests] = useState(initialGuests);
   const [quotePricing, setQuotePricing] = useState<{ basePrice: number; subtotal: number; cleaningFee: number; totalPrice: number } | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [data, setData] = useState<ApiPropertyDetail | null>(null);
@@ -426,14 +428,17 @@ export default function PropertyDetail() {
 
   const currentUnit = data?.units[selectedUnitIndex] ?? null;
 
-  // All rooms: guest options up to 10. Only Lykoskufi 5 & Ogra House change price with guests.
-  const isTieredPricingUnit = currentUnit?.name && /lykoskufi\s*5|ogra\s*house/i.test(currentUnit.name);
-  const effectiveMaxGuests = 10;
+  // Per-unit max guests: Small/Big Bungalow & Lykoskufi 1 = 3, Lykoskufi 2 = 5, others from API
+  const effectiveMaxGuests = currentUnit
+    ? (getMaxGuestsForUnit(currentUnit.name) ?? currentUnit.maxGuests ?? 10)
+    : 10;
+  const [showOverGuestMessage, setShowOverGuestMessage] = useState(false);
 
-  // Clamp selectedGuests when switching units
+  // Clamp selectedGuests when switching units or when over limit
   useEffect(() => {
     if (selectedGuests > effectiveMaxGuests) {
       setSelectedGuests(effectiveMaxGuests);
+      setShowOverGuestMessage(true);
     }
   }, [effectiveMaxGuests, selectedGuests]);
   const rawImages =
@@ -786,11 +791,14 @@ export default function PropertyDetail() {
               <>
                 {/* Header & Experience Description */}
                 <div className="mb-10">
-                  <h1 className={`text-3xl md:text-4xl font-bold text-foreground ${/small\s*bungalow/i.test(currentUnit.name) ? "mb-0" : "mb-6"}`}>
+                  <h1 className={`text-3xl md:text-4xl font-bold text-foreground ${/small\s*bungalow|lykoskufi\s*2|lykoskufi2/i.test(currentUnit.name) ? "mb-0" : "mb-6"}`}>
                     {currentUnit.name}
                   </h1>
                   {/small\s*bungalow/i.test(currentUnit.name) && (
                     <p className="text-muted-foreground text-sm mt-1 mb-6">Studio</p>
+                  )}
+                  {/lykoskufi\s*2|lykoskufi2/i.test(currentUnit.name) && (
+                    <p className="text-muted-foreground text-sm mt-1 mb-6">Mezzanine</p>
                   )}
 
                   {/* Description — from system translations (not admin panel) */}
@@ -1296,13 +1304,21 @@ export default function PropertyDetail() {
                     <label className="block text-sm font-medium text-foreground mb-2">{t("common.guests")}</label>
                     <select
                       value={selectedGuests}
-                      onChange={(e) => setSelectedGuests(Number(e.target.value))}
+                      onChange={(e) => {
+                        setSelectedGuests(Number(e.target.value));
+                        setShowOverGuestMessage(false);
+                      }}
                       className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
                     >
-                      {Array.from({ length: effectiveMaxGuests }, (_, i) => i + 1).map((n) => (
+                      {Array.from({ length: Math.min(effectiveMaxGuests, 20) }, (_, i) => i + 1).map((n) => (
                         <option key={n} value={n}>{n}</option>
                       ))}
                     </select>
+                    {showOverGuestMessage && (
+                      <p className="mt-2 text-sm text-amber-600 dark:text-amber-500">
+                        {t("property.guestsOverLimit").replace("{n}", String(effectiveMaxGuests))}
+                      </p>
+                    )}
                   </div>
 
                   <AvailabilityCalendar

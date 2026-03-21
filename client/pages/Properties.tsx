@@ -300,9 +300,10 @@ export default function Properties() {
                               {unit.name}
                             </h3>
                             {/small\s*bungalow/i.test(unit.name) && (
-                              <p className="text-sm text-muted-foreground mt-0.5">
-                                Studio
-                              </p>
+                              <p className="text-sm text-muted-foreground mt-0.5">Studio</p>
+                            )}
+                            {/lykoskufi\s*2|lykoskufi2/i.test(unit.name) && (
+                              <p className="text-sm text-muted-foreground mt-0.5">Mezzanine</p>
                             )}
                             <div className="flex flex-wrap gap-4 mt-2 text-sm">
                               <div className="flex items-center gap-2 text-foreground">

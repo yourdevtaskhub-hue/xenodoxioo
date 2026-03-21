@@ -46,3 +46,13 @@ export function getUnitBedTagKey(propertyName: string, unitName: string): string
   if (check("lykoskufi") || check("lykoski")) return "property.bedTags.lykoskufi1";
   return null;
 }
+
+/** Max guests per unit override. Returns number or null to use API/DB value. */
+export function getMaxGuestsForUnit(unitName: string): number | null {
+  const u = (unitName || "").toLowerCase().trim().replace(/\s+/g, " ");
+  if (/small\s*bungalow/i.test(u)) return 3;
+  if ((/big\s*bungalow|μεγάλο|megalo/i.test(u)) && /bungalow/i.test(u)) return 3;
+  if (/lykoskufi\s*1|lykoskufi1|lykoski\s*1/i.test(u)) return 3;
+  if (/lykoskufi\s*2|lykoskufi2|lykoski\s*2/i.test(u)) return 5;
+  return null;
+}
