@@ -390,12 +390,19 @@ export const handler = async (event: any, context: any) => {
           }
         }
         subtotal -= discountAmount;
-        const taxRate = 0.15;
+
+        const { data: taxRow } = await supabase.from('tax_settings').select('tax_rate, additional_fees').eq('is_active', true).single();
+        const taxRateDecimal = taxRow?.tax_rate != null ? parseFloat(taxRow.tax_rate) : 0.15;
+        const additionalFeesPct = taxRow?.additional_fees != null ? parseFloat(taxRow.additional_fees) : 0;
+        const taxRate = taxRateDecimal + (additionalFeesPct / 100);
         const taxes = Math.round((subtotal + cleaningFee) * taxRate * 100) / 100;
         const finalTotal = Math.round((subtotal + cleaningFee + taxes) * 100) / 100;
+
+        const { data: paymentRow } = await supabase.from('payment_settings').select('deposit_percentage, full_payment_threshold_days').eq('is_active', true).single();
+        const depositPct = (paymentRow?.deposit_percentage ?? 25) / 100;
+        const fullPaymentDays = paymentRow?.full_payment_threshold_days ?? 21;
         const daysToCheckIn = Math.ceil((checkIn.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        const isFullPayment = daysToCheckIn <= 21;
-        const depositPct = 0.25;
+        const isFullPayment = daysToCheckIn <= fullPaymentDays;
         const depositAmount = isFullPayment ? finalTotal : Math.round(finalTotal * depositPct * 100) / 100;
         const balanceAmount = finalTotal - depositAmount;
         return {
@@ -412,7 +419,7 @@ export const handler = async (event: any, context: any) => {
                 cleaningFee,
                 discountAmount,
                 taxes,
-                taxRate: 15,
+                taxRate: Math.round(taxRate * 100),
                 totalPrice: finalTotal,
                 depositAmount,
                 balanceAmount,
