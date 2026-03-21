@@ -404,6 +404,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Dashboard
     "dashboard.title": "My Account",
+    "dashboard.welcome": "Welcome",
     "dashboard.myBookings": "My Bookings",
     "dashboard.profileSettings": "Profile Settings",
     "dashboard.preferences": "Preferences",
@@ -1066,6 +1067,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "auth.confirmPassword": "Confirmer le mot de passe",
 
     "dashboard.title": "Mon compte",
+    "dashboard.welcome": "Bienvenue",
     "dashboard.myBookings": "Mes réservations",
     "dashboard.profileSettings": "Paramètres de profil",
     "dashboard.preferences": "Préférences",
@@ -1920,6 +1922,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "auth.confirmPassword": "Passwort bestätigen",
 
     "dashboard.title": "Mein Konto",
+    "dashboard.welcome": "Willkommen",
     "dashboard.myBookings": "Meine Buchungen",
     "dashboard.profileSettings": "Profileinstellungen",
     "dashboard.preferences": "Einstellungen",
@@ -2796,6 +2799,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "auth.confirmPassword": "Επιβεβαίωση κωδικού",
 
     "dashboard.title": "Ο λογαριασμός μου",
+    "dashboard.welcome": "Καλώς ήρθες",
     "dashboard.myBookings": "Οι κρατήσεις μου",
     "dashboard.profileSettings": "Ρυθμίσεις προφίλ",
     "dashboard.preferences": "Προτιμήσεις",

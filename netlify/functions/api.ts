@@ -389,19 +389,40 @@ export const handler = async (event: any, context: any) => {
       try {
         const jwt = await import('jsonwebtoken');
         const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-        const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+        const payload = jwt.verify(token, JWT_SECRET) as { userId: string; email?: string };
         const qs = event.queryStringParameters || {};
         const page = parseInt(qs.page || '1', 10);
         const pageSize = parseInt(qs.pageSize || '20', 10);
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
-        const { data: bookings, count } = await supabase
+        // Include bookings by user_id OR orphaned (user_id null) where guest_email matches
+        const userEmail = (payload.email || '').toLowerCase().trim();
+        let bookings: any[] = [];
+        let totalCount = 0;
+        const { data: byUserId, count: count1 } = await supabase
           .from('bookings')
           .select('*, unit:units(*, property:properties(*))', { count: 'exact' })
           .eq('user_id', payload.userId)
           .order('created_at', { ascending: false })
           .range(from, to);
-        const mapped = (bookings || []).map((b: any) => ({
+        bookings = byUserId || [];
+        totalCount = count1 ?? 0;
+        if (userEmail) {
+          const { data: orphaned, count: count2 } = await supabase
+            .from('bookings')
+            .select('*, unit:units(*, property:properties(*))', { count: 'exact' })
+            .is('user_id', null)
+            .ilike('guest_email', userEmail)
+            .order('created_at', { ascending: false });
+          const orphanedList = orphaned || [];
+          if (orphanedList.length > 0) {
+            const merged = [...(byUserId || []), ...orphanedList];
+            merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            bookings = merged.slice(from, to + 1);
+            totalCount = (count1 ?? 0) + (count2 ?? 0);
+          }
+        }
+        const mapped = bookings.map((b: any) => ({
           id: b.id,
           bookingNumber: b.booking_number,
           checkInDate: b.check_in_date,
@@ -421,7 +442,7 @@ export const handler = async (event: any, context: any) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             success: true,
-            data: { bookings: mapped, total: count ?? 0, page, pageSize }
+            data: { bookings: mapped, total: totalCount, page, pageSize }
           })
         };
       } catch {
@@ -442,11 +463,13 @@ export const handler = async (event: any, context: any) => {
       const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
       const email = event.queryStringParameters?.email?.trim();
       let userId: string | null = null;
+      let userEmail: string | null = null;
       if (token) {
         try {
           const jwt = await import('jsonwebtoken');
-          const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+          const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string; email?: string };
           userId = payload.userId;
+          userEmail = (payload.email || '').toLowerCase().trim() || null;
         } catch { /* invalid token */ }
       }
       if (!userId && !email) {
@@ -468,14 +491,16 @@ export const handler = async (event: any, context: any) => {
           body: JSON.stringify({ success: false, error: 'Booking not found' })
         };
       }
-      if (userId && booking.user_id !== userId) {
+      const userOwnsByUserId = userId && booking.user_id === userId;
+      const userOwnsByEmail = userId && userEmail && !booking.user_id && booking.guest_email?.toLowerCase() === userEmail;
+      if (userId && !userOwnsByUserId && !userOwnsByEmail) {
         return {
           statusCode: 403,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ success: false, error: 'Unauthorized' })
         };
       }
-      if (email && booking.guest_email?.toLowerCase() !== email.toLowerCase()) {
+      if (!userId && email && booking.guest_email?.toLowerCase() !== email.toLowerCase()) {
         return {
           statusCode: 403,
           headers: { 'Content-Type': 'application/json' },
@@ -692,6 +717,18 @@ export const handler = async (event: any, context: any) => {
         const body = JSON.parse(event.body || '{}');
         console.log(`📝 [${requestId}] Booking data:`, JSON.stringify(body, null, 2));
         
+        // Get user_id from auth token if logged in
+        let authUserId: string | null = null;
+        const authHeader = event.headers?.authorization || event.headers?.Authorization;
+        const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (token) {
+          try {
+            const jwt = await import('jsonwebtoken');
+            const payload = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+            authUserId = payload.userId;
+          } catch { /* invalid token */ }
+        }
+        
         // Validate required fields
         if (!body.unitId || !body.checkInDate || !body.checkOutDate || !body.guests) {
           return {
@@ -770,27 +807,29 @@ export const handler = async (event: any, context: any) => {
         const cleaningFee = Number(unit.cleaning_fee) || 0;
         const totalPrice = (basePrice * nights) + cleaningFee;
         
-        // Create booking
+        // Create booking (include user_id for logged-in users)
+        const insertData: Record<string, any> = {
+          booking_number: bookingNumber,
+          unit_id: body.unitId,
+          guest_name: body.guestName || '',
+          guest_email: body.guestEmail || '',
+          guest_phone: body.guestPhone || '',
+          check_in_date: body.checkInDate,
+          check_out_date: body.checkOutDate,
+          nights: nights,
+          total_nights: nights,
+          guests: parseInt(body.guests) || 1,
+          base_price: basePrice,
+          cleaning_fee: cleaningFee,
+          subtotal: basePrice * nights,
+          total_price: totalPrice,
+          status: 'PENDING',
+          cancellation_token: cancellationToken
+        };
+        if (authUserId) insertData.user_id = authUserId;
         const { data: booking, error } = await supabase
           .from('bookings')
-          .insert([{
-            booking_number: bookingNumber,
-            unit_id: body.unitId,
-            guest_name: body.guestName || '',
-            guest_email: body.guestEmail || '',
-            guest_phone: body.guestPhone || '',
-            check_in_date: body.checkInDate,
-            check_out_date: body.checkOutDate,
-            nights: nights,
-            total_nights: nights,
-            guests: parseInt(body.guests) || 1,
-            base_price: basePrice,
-            cleaning_fee: cleaningFee,
-            subtotal: basePrice * nights,
-            total_price: totalPrice,
-            status: 'PENDING',
-            cancellation_token: cancellationToken
-          }])
+          .insert([insertData])
           .select()
           .single();
 
