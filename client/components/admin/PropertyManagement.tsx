@@ -718,24 +718,50 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             {(formData.existingImages?.length || 0) > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {formData.existingImages.map((url: string, i: number) => (
-                  <div key={i} className="relative">
+                  <div
+                    key={`ex-${String(url)}`}
+                    className="relative group cursor-grab active:cursor-grabbing border-2 border-transparent hover:border-primary/50 rounded transition-colors"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", String(i));
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+                      if (from === i) return;
+                      const arr = [...formData.existingImages];
+                      const [removed] = arr.splice(from, 1);
+                      arr.splice(i, 0, removed);
+                      setFormData({ ...formData, existingImages: arr });
+                    }}
+                  >
                     <img 
                       src={imageUrl(typeof url === "string" ? url : String(url))} 
                       alt="" 
-                      className="w-20 h-20 object-cover rounded border" 
+                      className="w-20 h-20 object-cover rounded border pointer-events-none" 
+                      draggable={false}
                       onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                         e.currentTarget.src = placeholderImage();
                       }}
                     />
+                    <span className="absolute top-0.5 left-0.5 bg-black/50 text-white text-[10px] px-1 rounded">
+                      {i + 1}
+                    </span>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFormData({
                           ...formData,
                           existingImages: formData.existingImages.filter((_: string, j: number) => j !== i),
-                        })
-                      }
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs"
+                        });
+                      }}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
                     >
                       ×
                     </button>
@@ -746,12 +772,38 @@ function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyC
             {(formData.imageFiles?.length || 0) > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {formData.imageFiles.map((f, i) => (
-                  <img
-                    key={i}
-                    src={URL.createObjectURL(f)}
-                    alt=""
-                    className="w-20 h-20 object-cover rounded border"
-                  />
+                  <div
+                    key={`new-${i}-${f.name}`}
+                    className="relative group cursor-grab active:cursor-grabbing border-2 border-transparent hover:border-primary/50 rounded transition-colors"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", String(i));
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+                      if (from === i) return;
+                      const arr = [...formData.imageFiles];
+                      const [removed] = arr.splice(from, 1);
+                      arr.splice(i, 0, removed);
+                      setFormData({ ...formData, imageFiles: arr });
+                    }}
+                  >
+                    <img
+                      src={URL.createObjectURL(f)}
+                      alt=""
+                      className="w-20 h-20 object-cover rounded border pointer-events-none"
+                      draggable={false}
+                    />
+                    <span className="absolute top-0.5 left-0.5 bg-black/50 text-white text-[10px] px-1 rounded">
+                      {(formData.existingImages?.length || 0) + i + 1}
+                    </span>
+                  </div>
                 ))}
               </div>
             )}
