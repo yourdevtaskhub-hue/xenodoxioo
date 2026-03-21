@@ -1315,17 +1315,206 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
     // GET /api/admin/settings/tax
     if (path === '/api/admin/settings/tax' && method === 'GET') {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: true,
-          data: {
-            taxRate: 0.24,
-            currency: 'EUR'
+      try {
+        const { data: taxSettings, error } = await supabase
+          .from('tax_settings')
+          .select('*')
+          .eq('is_active', true)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taxRate: 15, additionalFees: 0, description: null })
+          };
+        }
+
+        const taxRate = taxSettings ? Math.round(parseFloat(taxSettings.tax_rate || 0) * 100) : 15;
+        const additionalFees = taxSettings ? parseFloat(taxSettings.additional_fees || 0) : 0;
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taxRate, additionalFees, description: taxSettings?.description || null })
+        };
+      } catch (e) {
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taxRate: 15, additionalFees: 0, description: null })
+        };
+      }
+    }
+
+    // PUT /api/admin/settings/tax
+    if (path === '/api/admin/settings/tax' && method === 'PUT') {
+      try {
+        const body = JSON.parse(event.body || '{}');
+        const { taxRate = 15, additionalFees = 0, description } = body;
+        const taxRateDecimal = (Number(taxRate) || 0) / 100;
+
+        const { data: existing } = await supabase.from('tax_settings').select('id').eq('is_active', true).single();
+
+        if (existing) {
+          const { error } = await supabase
+            .from('tax_settings')
+            .update({
+              tax_rate: taxRateDecimal,
+              additional_fees: additionalFees || 0,
+              description: description || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id);
+
+          if (error) {
+            return {
+              statusCode: 500,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ success: false, message: 'Failed to save tax settings' })
+            };
           }
-        })
-      };
+        } else {
+          const { error } = await supabase.from('tax_settings').insert({
+            tax_rate: taxRateDecimal,
+            additional_fees: additionalFees || 0,
+            description: description || null,
+            is_active: true
+          });
+
+          if (error) {
+            return {
+              statusCode: 500,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ success: false, message: 'Failed to save tax settings' })
+            };
+          }
+        }
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, taxRate, additionalFees: additionalFees || 0, description: description || null })
+        };
+      } catch (e: any) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: 'Failed to save settings' })
+        };
+      }
+    }
+
+    // GET /api/admin/settings/payment
+    if (path === '/api/admin/settings/payment' && method === 'GET') {
+      try {
+        const { data, error } = await supabase
+          .from('payment_settings')
+          .select('*')
+          .eq('is_active', true)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: true,
+              data: {
+                deposit_percentage: 25,
+                balance_charge_days_before: 21,
+                full_payment_threshold_days: 21,
+                refund_deposit_on_cancel: false,
+                currency: 'EUR'
+              }
+            })
+          };
+        }
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: data || {
+              deposit_percentage: 25,
+              balance_charge_days_before: 21,
+              full_payment_threshold_days: 21,
+              refund_deposit_on_cancel: false,
+              currency: 'EUR'
+            }
+          })
+        };
+      } catch (e) {
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            success: true,
+            data: {
+              deposit_percentage: 25,
+              balance_charge_days_before: 21,
+              full_payment_threshold_days: 21,
+              refund_deposit_on_cancel: false,
+              currency: 'EUR'
+            }
+          })
+        };
+      }
+    }
+
+    // PUT /api/admin/settings/payment
+    if (path === '/api/admin/settings/payment' && method === 'PUT') {
+      try {
+        const body = JSON.parse(event.body || '{}');
+        const { depositPercentage, balanceChargeDaysBefore, fullPaymentThresholdDays, refundDepositOnCancel } = body;
+
+        const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (depositPercentage !== undefined) updates.deposit_percentage = depositPercentage;
+        if (balanceChargeDaysBefore !== undefined) updates.balance_charge_days_before = balanceChargeDaysBefore;
+        if (fullPaymentThresholdDays !== undefined) updates.full_payment_threshold_days = fullPaymentThresholdDays;
+        if (refundDepositOnCancel !== undefined) updates.refund_deposit_on_cancel = refundDepositOnCancel;
+
+        const { data: existing } = await supabase.from('payment_settings').select('id').eq('is_active', true).single();
+
+        if (existing) {
+          const { error } = await supabase.from('payment_settings').update(updates).eq('id', existing.id);
+          if (error) {
+            return {
+              statusCode: 500,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ success: false, message: 'Failed to save payment settings' })
+            };
+          }
+        } else {
+          const { error } = await supabase.from('payment_settings').insert({
+            deposit_percentage: depositPercentage ?? 25,
+            balance_charge_days_before: balanceChargeDaysBefore ?? 21,
+            full_payment_threshold_days: fullPaymentThresholdDays ?? 21,
+            refund_deposit_on_cancel: refundDepositOnCancel ?? false,
+            currency: 'EUR',
+            is_active: true
+          });
+          if (error) {
+            return {
+              statusCode: 500,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ success: false, message: 'Failed to save payment settings' })
+            };
+          }
+        }
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true })
+        };
+      } catch (e: any) {
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, message: 'Failed to save payment settings' })
+        };
+      }
     }
 
     // POST /api/admin/properties
