@@ -518,9 +518,11 @@ export const handler = async (event: any, context: any) => {
             check_in_date: body.checkInDate,
             check_out_date: body.checkOutDate,
             nights: nights,
+            total_nights: nights,
             guests: parseInt(body.guests) || 1,
             base_price: basePrice,
             cleaning_fee: cleaningFee,
+            subtotal: basePrice * nights,
             total_price: totalPrice,
             status: 'PENDING',
             cancellation_token: cancellationToken
