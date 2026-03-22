@@ -1181,6 +1181,7 @@ export const handler = async (event: any, context: any) => {
 
       // POST /api/payments/create-intent-from-offer (no auth)
       if (path === '/api/payments/create-intent-from-offer' && method === 'POST') {
+        console.log('[API] create-intent-from-offer called');
         let body: { offerToken?: string; guestName?: string; guestEmail?: string; guestPhone?: string } = {};
         try {
           body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
@@ -1193,8 +1194,10 @@ export const handler = async (event: any, context: any) => {
         }
         const { data: offer } = await supabase.from('custom_checkout_offers').select('*').eq('token', offerToken).is('used_at', null).single();
         if (!offer) {
+          console.error('[API] Offer not found or used:', offerToken);
           return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Offer not found or already used' }) };
         }
+        console.log('[API] Offer found, unit:', offer.unit_id, 'creating PI...');
         const amountEur = Number(offer.custom_total_eur) || 0;
         const cents = Math.round(amountEur * 100);
         if (cents < 50) {
@@ -1216,13 +1219,18 @@ export const handler = async (event: any, context: any) => {
             metadata: { offerToken, type: 'custom_offer' },
             payment_method_types: ['card'],
           });
-          await supabase.from('pending_offer_checkouts').insert({
+          const { error: pendingErr } = await supabase.from('pending_offer_checkouts').insert({
             offer_token: offerToken,
             guest_name: guestName,
             guest_email: guestEmail,
             guest_phone: guestPhone || null,
             stripe_payment_intent_id: pi.id,
           });
+          if (pendingErr) {
+            console.error('[API] pending_offer_checkouts insert FAILED:', pendingErr);
+            return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Failed to register checkout — contact support' }) };
+          }
+          console.log('[API] create-intent-from-offer OK — PI', pi.id, 'pending record saved for webhook');
           return {
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },

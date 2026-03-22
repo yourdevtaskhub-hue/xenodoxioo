@@ -11,6 +11,13 @@ interface InquiryMessage {
   created_at: string;
 }
 
+function formatDateOnly(str: string | null | undefined): string {
+  if (!str) return "—";
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).toLocaleDateString();
+  return new Date(str).toLocaleDateString();
+}
+
 interface Inquiry {
   id: string;
   guest_name: string;
@@ -123,7 +130,7 @@ export default function InquiryConversation() {
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Property: <strong>{inquiry.property?.name}</strong></p>
             <p className="text-sm text-muted-foreground">
-              {new Date(inquiry.checkin_date).toLocaleDateString()} - {new Date(inquiry.checkout_date).toLocaleDateString()} | {inquiry.guests} guests
+              {formatDateOnly(inquiry.checkin_date)} - {formatDateOnly(inquiry.checkout_date)} | {inquiry.guests} guests
             </p>
             <p className="text-sm text-muted-foreground">Status: <span className="font-semibold capitalize">{inquiry.status.toLowerCase().replace("_", " ")}</span></p>
           </div>

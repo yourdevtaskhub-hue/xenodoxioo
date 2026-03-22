@@ -195,6 +195,13 @@ function InquiriesManagement({ onReplySent, onInquiryViewed }: { onReplySent?: (
         setUnits(u);
         if (u.length) setOfferUnitId(u[0].id);
       }
+      const ci = String(inquiry.checkin_date || "").slice(0, 10);
+      const co = String(inquiry.checkout_date || "").slice(0, 10);
+      if (ci && co) {
+        setOfferCheckIn(ci);
+        setOfferCheckOut(co);
+      }
+      setOfferGuests(inquiry.guests || 2);
     } catch {}
   };
 
@@ -261,6 +268,18 @@ function InquiriesManagement({ onReplySent, onInquiryViewed }: { onReplySent?: (
     finally { setSending(false); }
   };
 
+  const formatDateOnly = (str: string | null | undefined) => {
+    if (!str) return "—";
+    const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).toLocaleDateString();
+    return new Date(str).toLocaleDateString();
+  };
+  const toDateInputValue = (str: string | null | undefined) => {
+    if (!str) return "";
+    const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : str.slice(0, 10);
+  };
+
   if (selectedInquiry) {
     return (
       <div>
@@ -270,7 +289,7 @@ function InquiriesManagement({ onReplySent, onInquiryViewed }: { onReplySent?: (
           <h3 className="font-bold text-foreground mb-2">{t("admin.inquiryFrom")} {selectedInquiry.guest_name}</h3>
           <p className="text-sm text-muted-foreground">{selectedInquiry.guest_email}</p>
           <p className="text-sm text-muted-foreground">
-            {new Date(selectedInquiry.checkin_date).toLocaleDateString()} - {new Date(selectedInquiry.checkout_date).toLocaleDateString()} | {selectedInquiry.guests} {t("common.guests").toLowerCase()}
+            {formatDateOnly(selectedInquiry.checkin_date)} - {formatDateOnly(selectedInquiry.checkout_date)} | {selectedInquiry.guests} {t("common.guests").toLowerCase()}
           </p>
           <p className="text-sm mt-1">{t("admin.propertyLabel")} <strong>{selectedInquiry.property?.name || "—"}</strong></p>
           <p className="text-sm">{t("admin.statusLabel")} <span className="font-semibold capitalize">{selectedInquiry.status?.toLowerCase().replace("_", " ")}</span></p>
@@ -396,7 +415,7 @@ function InquiriesManagement({ onReplySent, onInquiryViewed }: { onReplySent?: (
                   <p className="font-semibold text-foreground">{inq.guest_name}</p>
                   <p className="text-sm text-muted-foreground">{inq.guest_email}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(inq.checkin_date).toLocaleDateString()} - {new Date(inq.checkout_date).toLocaleDateString()} | {inq.property?.name || "—"}
+                    {formatDateOnly(inq.checkin_date)} - {formatDateOnly(inq.checkout_date)} | {inq.property?.name || "—"}
                   </p>
                 </div>
                 <div className="text-right">

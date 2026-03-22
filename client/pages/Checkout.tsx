@@ -70,7 +70,7 @@ function StripePaymentForm({
 
     const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
     if (paymentIntent?.status === "succeeded") {
-      console.log("[CHECKOUT] Payment confirmed as succeeded via Stripe:", paymentIntent.id);
+      console.log("[CHECKOUT] Payment confirmed via Stripe — PI:", paymentIntent.id, "| Webhook will create booking (check Netlify stripe-webhook logs)");
       onSuccess();
     } else {
       console.warn("[CHECKOUT] Payment status after confirm:", paymentIntent?.status);

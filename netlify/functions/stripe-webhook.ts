@@ -5,6 +5,7 @@ import { Resend } from "resend";
 const GUEST_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 export const handler = async (event: any) => {
+  console.log("[WEBHOOK] Received request");
   const sig = event.headers["stripe-signature"] || event.headers["Stripe-Signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -16,7 +17,7 @@ export const handler = async (event: any) => {
   const rawBody = typeof event.body === "string" ? event.body : JSON.stringify(event.body || {});
 
   if (!webhookSecret) {
-    console.warn("[WEBHOOK] STRIPE_WEBHOOK_SECRET not set — rejecting in production");
+    console.error("[WEBHOOK] STRIPE_WEBHOOK_SECRET not set — webhook cannot verify events");
     return { statusCode: 500, body: "Webhook not configured" };
   }
 
@@ -29,7 +30,7 @@ export const handler = async (event: any) => {
     return { statusCode: 400, body: `Webhook Error: ${err.message}` };
   }
 
-  console.log("[WEBHOOK] Verified event:", stripeEvent.type, stripeEvent.id);
+  console.log("[WEBHOOK] Verified event:", stripeEvent.type, stripeEvent.id, stripeEvent.data?.object?.id);
 
   const supabase = createClient(
     process.env.SUPABASE_URL!,
@@ -42,6 +43,7 @@ export const handler = async (event: any) => {
     if (stripeEvent.type === "payment_intent.succeeded") {
       const pi = stripeEvent.data.object as Stripe.PaymentIntent;
       const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id;
+      console.log("[WEBHOOK] Processing payment_intent.succeeded", pi.id, "metadata:", JSON.stringify(pi.metadata || {}));
       await processSuccessfulPayment(supabase, stripe, pi.id, chargeId);
     } else if (stripeEvent.type === "charge.succeeded") {
       const charge = stripeEvent.data.object as Stripe.Charge;
@@ -64,6 +66,8 @@ async function processOfferPayment(
   paymentIntentId: string,
   chargeId?: string
 ) {
+  console.log("[WEBHOOK-OFFER] Starting processOfferPayment for PI", paymentIntentId);
+
   // Ensure guest user exists (required for payments FK)
   const { error: guestErr } = await supabase.from("users").upsert(
     {
@@ -88,9 +92,10 @@ async function processOfferPayment(
     .single();
 
   if (!pending) {
-    console.warn("[WEBHOOK] No pending offer for PI", paymentIntentId);
+    console.error("[WEBHOOK-OFFER] No pending_offer_checkouts record for PI", paymentIntentId, "- create-intent-from-offer may not have run or used different DB");
     return;
   }
+  console.log("[WEBHOOK-OFFER] Found pending record, offer_token:", pending.offer_token);
 
   const { data: offer } = await supabase
     .from("custom_checkout_offers")
@@ -99,9 +104,10 @@ async function processOfferPayment(
     .single();
 
   if (!offer || offer.used_at) {
-    console.warn("[WEBHOOK] Offer not found or used:", pending.offer_token);
+    console.error("[WEBHOOK-OFFER] Offer not found or already used:", pending.offer_token);
     return;
   }
+  console.log("[WEBHOOK-OFFER] Using offer, unit:", offer.unit_id, "checkIn:", offer.check_in_date);
 
   const { nanoid } = await import("nanoid");
   const { randomBytes } = await import("crypto");
@@ -201,6 +207,9 @@ async function processOfferPayment(
     .single();
 
   const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("[WEBHOOK-OFFER] RESEND_API_KEY not set — emails will not be sent to", booking.guest_email);
+  }
   if (apiKey && fullBooking) {
     const resend = new Resend(apiKey);
     const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`;
@@ -211,22 +220,26 @@ async function processOfferPayment(
     const checkInStr = checkIn.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     const checkOutStr = checkOut.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-    await resend.emails.send({
+    const receiptRes = await resend.emails.send({
       from,
       to: booking.guest_email,
       subject: "Payment Receipt - " + bookingNumber,
       html: `<h1>Payment Receipt</h1><p>Dear ${booking.guest_name},</p><p>Your payment of €${customTotal.toFixed(2)} has been processed. Booking ${bookingNumber} confirmed.</p><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
     });
+    if (receiptRes.error) console.error("[WEBHOOK-OFFER] Receipt email failed:", receiptRes.error);
+    else console.log("[WEBHOOK-OFFER] Receipt email sent to", booking.guest_email);
 
-    await resend.emails.send({
+    const confirmRes = await resend.emails.send({
       from,
       to: booking.guest_email,
       subject: "Booking Confirmation",
       html: `<h1>Booking Confirmation</h1><p>Dear ${booking.guest_name},</p><p>Thank you for your booking.</p><ul><li><strong>Booking:</strong> ${bookingNumber}</li><li><strong>Room:</strong> ${property?.name || "N/A"}</li><li><strong>Arrival:</strong> ${checkInStr}</li><li><strong>Departure:</strong> ${checkOutStr}</li><li><strong>Total:</strong> €${customTotal.toFixed(2)}</li></ul><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p>${cancelUrl ? `<p>Need to cancel? <a href="${cancelUrl}" style="color:#0677A1;">Cancel your booking</a></p>` : ""}<p>Best regards,<br/>LEONIDIONHOUSES</p>`,
     });
+    if (confirmRes.error) console.error("[WEBHOOK-OFFER] Confirmation email failed:", confirmRes.error);
+    else console.log("[WEBHOOK-OFFER] Confirmation email sent to", booking.guest_email);
   }
 
-  console.log("[WEBHOOK] Created booking from custom offer:", bookingNumber);
+  console.log("[WEBHOOK-OFFER] DONE — booking", bookingNumber, "created, status CONFIRMED");
 }
 
 async function processSuccessfulPayment(

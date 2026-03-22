@@ -103,6 +103,14 @@ router.get("/stats", async (req, res) => {
     const totalRevenue = bookings?.reduce((sum, b) => sum + (parseFloat(b.total_paid) || 0), 0) || 0;
     const totalUsers = users?.length || 0;
     const propertiesCount = properties?.length || 0;
+
+    let unreadInquiriesCount = 0;
+    const { data: rpcCount, error: rpcErr } = await supabase.rpc('count_unread_inquiries');
+    if (!rpcErr && typeof rpcCount === 'number') unreadInquiriesCount = rpcCount;
+    else {
+      const { count: fallback } = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).in('status', ['NEW', 'GUEST_REPLIED']);
+      unreadInquiriesCount = fallback ?? 0;
+    }
     
     // Monthly occupancy by property — current month: booked days / total days in month
     const now = new Date();
@@ -162,7 +170,8 @@ router.get("/stats", async (req, res) => {
       totalUsers,
       propertiesCount,
       occupancyByProperty,
-      activeUsers: users?.filter(u => u.status === 'ACTIVE').length || 0
+      activeUsers: users?.filter(u => u.status === 'ACTIVE').length || 0,
+      unreadInquiriesCount: unreadInquiriesCount ?? 0
     };
     
     console.log("✅ [ADMIN] Stats calculated:", stats);
@@ -178,7 +187,8 @@ router.get("/stats", async (req, res) => {
       totalUsers: 0,
       propertiesCount: 0,
       occupancyByProperty: [],
-      activeUsers: 0
+      activeUsers: 0,
+      unreadInquiriesCount: 0
     });
   }
 });

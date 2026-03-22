@@ -42,13 +42,20 @@ scripts/add-custom-checkout-offers.sql
 - τους πίνακες `custom_checkout_offers` και `pending_offer_checkouts`
 - τον guest user που χρειάζεται η πίνακας `payments`
 
-## 4. Έλεγχος
+## 4. Έλεγχος & Logs
 
 Μετά την πληρωμή από custom link:
 
-1. **Netlify → Functions → stripe-webhook → Logs:** Έλεγξε αν φτάνουν events και αν υπάρχουν errors
-2. **Stripe Dashboard → Webhooks:** Δες το webhook endpoint και τα recent events (success/failed)
-3. Αν το webhook αποτύχει, το Stripe θα δείξει το error message
+1. **Stripe Dashboard → Webhooks → [endpoint] → Recent events:** Δες αν το `payment_intent.succeeded` έφτασε και τι απάντηση πήρε (200 = OK, 500 = server error)
+2. **Netlify → Functions → stripe-webhook → Logs:** Θα δεις αναλυτικά:
+   - `[WEBHOOK] Received request`
+   - `[WEBHOOK] Verified event: payment_intent.succeeded`
+   - `[WEBHOOK-OFFER] Starting processOfferPayment...`
+   - `[WEBHOOK-OFFER] Found pending record...`
+   - `[WEBHOOK-OFFER] Offer booking created: BKxxx`
+   - `[WEBHOOK-OFFER] DONE — booking BKxxx created`
+3. Αν σταματήσει πιο πριν (π.χ. "No pending offer for PI") → το create-intent-from-offer δεν έτρεξε ή έγραφε σε άλλο DB
+4. Αν "Payments insert failed" → τρέξε το migration στο Supabase (guest user)
 
 ## Συχνά προβλήματα
 
