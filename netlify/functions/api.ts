@@ -1241,6 +1241,172 @@ export const handler = async (event: any, context: any) => {
         }
       }
 
+      // POST /api/payments/complete-offer-payment — client-side fallback when webhook doesn't fire
+      if (path === '/api/payments/complete-offer-payment' && method === 'POST') {
+        const GUEST_USER_ID = '00000000-0000-0000-0000-000000000001';
+        let body: { paymentIntentId?: string } = {};
+        try {
+          body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : event.body || {};
+        } catch {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Invalid JSON' }) };
+        }
+        const { paymentIntentId } = body;
+        if (!paymentIntentId || typeof paymentIntentId !== 'string') {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'paymentIntentId required' }) };
+        }
+        console.log('[API] complete-offer-payment called for PI', paymentIntentId);
+        try {
+          const Stripe = (await import('stripe')).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+          const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+          if (pi.status !== 'succeeded' && pi.status !== 'processing') {
+            return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: `Payment not completed (status: ${pi.status})` }) };
+          }
+          const chargeId = typeof pi.latest_charge === 'string' ? pi.latest_charge : (pi.latest_charge as any)?.id;
+
+          // Idempotent: if payment already exists for this PI, return success
+          const { data: existingPayment } = await supabase.from('payments').select('booking_id').eq('stripe_payment_intent_id', paymentIntentId).eq('status', 'COMPLETED').single();
+          if (existingPayment?.booking_id) {
+            const { data: existingBooking } = await supabase.from('bookings').select('id, booking_number').eq('id', existingPayment.booking_id).single();
+            console.log('[API] complete-offer-payment: booking already exists', existingBooking?.booking_number);
+            return {
+              statusCode: 200,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ success: true, data: { bookingId: existingPayment.booking_id, bookingNumber: existingBooking?.booking_number, alreadyComplete: true } })
+            };
+          }
+
+          const { error: guestErr } = await supabase.from('users').upsert(
+            { id: GUEST_USER_ID, email: 'guest-system@leonidion-houses.com', first_name: 'Guest', last_name: 'User', password: 'no-login-placeholder', role: 'CUSTOMER', status: 'INACTIVE' },
+            { onConflict: 'id' }
+          );
+          if (guestErr) console.warn('[API] Guest user upsert:', guestErr.message);
+
+          const { data: pending } = await supabase.from('pending_offer_checkouts').select('*').eq('stripe_payment_intent_id', paymentIntentId).single();
+          if (!pending) {
+            return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'No pending offer found — payment may already be processed' }) };
+          }
+
+          const { data: offer } = await supabase.from('custom_checkout_offers').select('*').eq('token', pending.offer_token).single();
+          if (!offer || offer.used_at) {
+            return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Offer not found or already used' }) };
+          }
+
+          const { nanoid } = await import('nanoid');
+          const bookingNumber = `BK${nanoid(8).toUpperCase()}`;
+          const parseOfferDate = (s: string) => {
+            const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0));
+            return new Date(s);
+          };
+          const checkIn = parseOfferDate((offer.check_in_date || '').toString().slice(0, 10));
+          const checkOut = parseOfferDate((offer.check_out_date || '').toString().slice(0, 10));
+          const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          const customTotal = Number(offer.custom_total_eur) || 0;
+          const cancellationToken = randomBytes(32).toString('hex');
+
+          const { data: booking, error: bookErr } = await supabase.from('bookings').insert({
+            booking_number: bookingNumber,
+            unit_id: offer.unit_id,
+            user_id: null,
+            check_in_date: checkIn.toISOString(),
+            check_out_date: checkOut.toISOString(),
+            nights,
+            base_price: Math.round((customTotal / nights) * 100) / 100,
+            total_nights: nights,
+            subtotal: customTotal,
+            cleaning_fee: 0,
+            taxes: 0,
+            discount_amount: 0,
+            deposit_amount: customTotal,
+            balance_amount: 0,
+            remaining_amount: 0,
+            total_price: customTotal,
+            guests: offer.guests,
+            guest_name: pending.guest_name,
+            guest_email: pending.guest_email,
+            guest_phone: pending.guest_phone,
+            payment_status: 'PENDING',
+            payment_type: 'FULL',
+            deposit_paid: false,
+            balance_paid: false,
+            status: 'PENDING',
+            cancellation_token: cancellationToken,
+          }).select().single();
+
+          if (bookErr || !booking) {
+            console.error('[API] complete-offer-payment booking insert failed:', bookErr);
+            return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Booking creation failed' }) };
+          }
+
+          const { error: payErr } = await supabase.from('payments').insert({
+            booking_id: booking.id,
+            user_id: GUEST_USER_ID,
+            amount: customTotal,
+            currency: 'EUR',
+            payment_type: 'FULL',
+            stripe_payment_intent_id: paymentIntentId,
+            stripe_charge_id: chargeId || null,
+            status: 'COMPLETED',
+            processed_at: new Date().toISOString(),
+            description: `Full payment (custom offer) for ${bookingNumber}`,
+          });
+          if (payErr) {
+            console.error('[API] complete-offer-payment payments insert failed:', payErr);
+            return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Payment record failed' }) };
+          }
+
+          await supabase.from('bookings').update({
+            deposit_paid: true,
+            balance_paid: true,
+            payment_status: 'PAID_FULL',
+            status: 'CONFIRMED',
+            total_paid: customTotal,
+            remaining_amount: 0,
+          }).eq('id', booking.id);
+
+          await supabase.from('custom_checkout_offers').update({ used_at: new Date().toISOString() }).eq('token', pending.offer_token);
+          await supabase.from('pending_offer_checkouts').delete().eq('id', pending.id);
+
+          const frontendUrl = process.env.FRONTEND_URL || 'https://www.leonidion-houses.com';
+          const apiKey = process.env.RESEND_API_KEY;
+          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`;
+          const viewUrl = `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || '')}`;
+          const checkInStr = checkIn.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          const checkOutStr = checkOut.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+          if (apiKey) {
+            const Resend = (await import('resend')).default;
+            const resend = new Resend(apiKey);
+            const { data: fullBooking } = await supabase.from('bookings').select('*, unit:units(*, property:properties(*))').eq('id', booking.id).single();
+            const unit = (fullBooking as any)?.unit;
+            const property = unit?.property;
+            await resend.emails.send({
+              from,
+              to: booking.guest_email,
+              subject: 'Payment Receipt - ' + bookingNumber,
+              html: `<h1>Payment Receipt</h1><p>Dear ${booking.guest_name},</p><p>Your payment of €${customTotal.toFixed(2)} has been processed. Booking ${bookingNumber} confirmed.</p><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
+            });
+            await resend.emails.send({
+              from,
+              to: booking.guest_email,
+              subject: 'Booking Confirmation',
+              html: `<h1>Booking Confirmation</h1><p>Dear ${booking.guest_name},</p><p>Thank you for your booking.</p><ul><li><strong>Booking:</strong> ${bookingNumber}</li><li><strong>Room:</strong> ${property?.name || 'N/A'}</li><li><strong>Arrival:</strong> ${checkInStr}</li><li><strong>Departure:</strong> ${checkOutStr}</li><li><strong>Total:</strong> €${customTotal.toFixed(2)}</li></ul><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
+            });
+          }
+
+          console.log('[API] complete-offer-payment OK — booking', bookingNumber, booking.id);
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: true, data: { bookingId: booking.id, bookingNumber } })
+          };
+        } catch (err: any) {
+          console.error('[API] complete-offer-payment error:', err);
+          return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: err?.message || 'Failed to complete offer payment' }) };
+        }
+      }
+
       // POST /api/payments/create-intent (auth) - for logged-in users
       if (path === '/api/payments/create-intent' && method === 'POST') {
         const authHeader = event.headers?.authorization || event.headers?.Authorization;

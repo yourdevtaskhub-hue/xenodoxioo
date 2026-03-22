@@ -38,7 +38,7 @@ function StripePaymentForm({
   setIsProcessing,
   clientSecret,
 }: {
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId?: string) => void;
   isProcessing: boolean;
   setIsProcessing: (v: boolean) => void;
   clientSecret: string;
@@ -70,12 +70,11 @@ function StripePaymentForm({
 
     const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
     if (paymentIntent?.status === "succeeded") {
-      console.log("[CHECKOUT] Payment confirmed via Stripe — PI:", paymentIntent.id, "| Webhook will create booking (check Netlify stripe-webhook logs)");
-      onSuccess();
+      onSuccess(paymentIntent.id);
     } else {
       console.warn("[CHECKOUT] Payment status after confirm:", paymentIntent?.status);
       if (paymentIntent?.status === "processing") {
-        onSuccess();
+        onSuccess(paymentIntent?.id);
       } else {
         setErrorMessage(`Payment status: ${paymentIntent?.status || "unknown"}. Please try again.`);
         setIsProcessing(false);
@@ -404,37 +403,50 @@ export default function Checkout() {
     }
   };
 
-  const handlePaymentSuccess = async () => {
-    if (!isOfferFlow && bookingId) {
+  const handlePaymentSuccess = async (paymentIntentId?: string) => {
+    let completedBookingId: string | null = null;
+    if (isOfferFlow && paymentIntentId) {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          console.log(`[CHECKOUT] Confirming payment status (attempt ${attempt})...`);
+          const res = await fetch(apiUrl("/api/payments/complete-offer-payment"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paymentIntentId }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (res.ok && json.success) {
+            completedBookingId = json.data?.bookingId ?? null;
+            break;
+          }
+          if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+        } catch {
+          if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+    } else if (!isOfferFlow && bookingId) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
           const res = await fetch(apiUrl(`/api/payments/confirm-status/${bookingId}`), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
           });
           const json = await res.json().catch(() => ({}));
-          console.log("[CHECKOUT] Confirm response:", json);
-          if (res.ok && (json.data?.confirmed || json.data?.alreadyConfirmed)) {
-            console.log("[CHECKOUT] Booking confirmed successfully!");
-            break;
-          }
-          if (attempt < 3) {
-            await new Promise((r) => setTimeout(r, 1000 * attempt));
-          }
-        } catch (err) {
-          console.error(`[CHECKOUT] Confirm attempt ${attempt} failed:`, err);
-          if (attempt < 3) {
-            await new Promise((r) => setTimeout(r, 1000 * attempt));
-          }
+          if (res.ok && (json.data?.confirmed || json.data?.alreadyConfirmed)) break;
+          if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+        } catch {
+          if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
     }
     setPaymentComplete(true);
     setIsProcessing(false);
-    setTimeout(() => {
-      navigate(isLoggedIn ? "/dashboard" : "/");
-    }, 3000);
+    const target =
+      isOfferFlow && completedBookingId
+        ? `/booking/${completedBookingId}${formData.email ? `?email=${encodeURIComponent(formData.email)}` : ""}`
+        : isLoggedIn
+          ? "/dashboard"
+          : "/";
+    setTimeout(() => navigate(target), 3000);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
