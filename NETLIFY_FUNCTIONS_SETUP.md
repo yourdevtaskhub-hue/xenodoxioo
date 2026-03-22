@@ -6,6 +6,7 @@
 
 | Function | Path | Λειτουργία |
 |----------|------|------------|
+| `admin-stats` | `/api/admin/stats` | Stats για πίνακα ελέγχου (συμπεριλαμβάνει custom URL κρατήσεις) |
 | `stripe-webhook` | `/api/payments/webhook` | Λαμβάνει Stripe events, ενημερώνει DB, στέλνει emails μέσω Resend |
 | `create-guest-payment-intent` | `/api/payments/create-guest-intent` | Δημιουργεί Stripe PaymentIntent για guest checkout |
 | `confirm-payment-status` | `/api/payments/confirm-status/:id` | Fallback όταν το webhook αργεί — ενημερώνει booking |

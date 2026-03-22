@@ -28,6 +28,13 @@
   status = 200
   to = "/.netlify/functions/confirm-payment-status"
 
+# Admin stats — dedicated function (ensures custom URL bookings are counted)
+[[redirects]]
+  force = true
+  from = "/api/admin/stats"
+  status = 200
+  to = "/.netlify/functions/admin-stats"
+
 # API: rewrite remaining /api/* to main api function
 [[redirects]]
   force = true
