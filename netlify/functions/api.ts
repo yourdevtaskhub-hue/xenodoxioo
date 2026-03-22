@@ -2305,67 +2305,85 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
       };
     }
 
-    // GET /api/admin/stats (includes custom URL / offer bookings)
+    // GET /api/admin/stats (includes custom URL / offer bookings) — same logic as admin-stats
     if (path === '/api/admin/stats' && method === 'GET') {
-      const [bookingsResult, usersResult, propertiesResult, inquiriesRpcResult] = await Promise.all([
+      const [bookingsResult, offersResult, usersResult, propertiesResult, unitsResult, inquiriesRpcResult] = await Promise.all([
         supabase.from('bookings').select('status, unit_id, check_in_date, check_out_date, total_paid, total_price'),
+        supabase.from('custom_checkout_offers').select('unit_id, check_in_date, check_out_date').not('used_at', 'is', null),
         supabase.from('users').select('id, status', { count: 'exact' }),
-        supabase.from('properties').select(`
-          id,
-          name,
-          units:units(id)
-        `),
+        supabase.from('properties').select('id, name'),
+        supabase.from('units').select('id, name, property_id').eq('is_active', true).order('name'),
         supabase.rpc('count_unread_inquiries')
       ]);
 
       const bookings = bookingsResult.data || [];
+      const customOffers = (offersResult as any)?.data ?? [];
       const users = usersResult.data || [];
       const properties = propertiesResult.data || [];
+      const units = unitsResult.data || [];
       const totalUsers = usersResult.count ?? users.length;
 
       const ACTIVE_STATUSES = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
       const confirmedBookings = bookings.filter((b: any) => ACTIVE_STATUSES.includes(b.status));
-      const totalRevenue = bookings
-        .filter((b: any) => ACTIVE_STATUSES.includes(b.status))
-        .reduce((sum: any, b: any) => sum + (parseFloat(b.total_paid) || parseFloat(b.total_price) || 0), 0);
+      const occupancyBookings = confirmedBookings;
+      const totalRevenue = confirmedBookings.reduce((sum: number, b: any) => sum + (parseFloat(b.total_paid) || parseFloat(b.total_price) || 0), 0);
 
+      const qs = event.queryStringParameters || {};
       const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 0);
-      const daysInMonth = monthEnd.getDate();
-      const toDateKey = (d: Date) => d.toISOString().slice(0, 10);
+      let year = qs.year ? parseInt(qs.year, 10) : now.getFullYear();
+      let month = qs.month ? parseInt(qs.month, 10) - 1 : now.getMonth();
+      if (isNaN(year) || year < 2020 || year > 2030) year = now.getFullYear();
+      if (isNaN(month) || month < 0 || month > 11) month = now.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthStartStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const monthEndStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
-      const occupancyByProperty = properties.map((property: any) => {
-        const units = property.units || [];
-        const totalUnits = units.length;
-        const bookedDatesByUnit = new Map<string, Set<string>>();
-        units.forEach((u: any) => bookedDatesByUnit.set(u.id, new Set()));
+      const parseDate = (s: string) => {
+        const raw = String(s || '').slice(0, 10);
+        const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return { y: +m[1], m: +m[2] - 1, d: +m[3] };
+        return null;
+      };
+      const dateToStr = (y: number, m: number, d: number) =>
+        `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-        confirmedBookings.forEach((booking: any) => {
-          const unitSet = bookedDatesByUnit.get(booking.unit_id);
-          if (!unitSet) return;
-          const checkIn = new Date(booking.check_in_date);
-          const checkOut = new Date(booking.check_out_date);
-          const start = new Date(Math.max(checkIn.getTime(), monthStart.getTime()));
-          const end = new Date(Math.min(checkOut.getTime(), monthEnd.getTime() + 86400000));
-          for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-            unitSet.add(toDateKey(d));
+      const bookedDaysByUnitId = new Map<string, Set<string>>();
+      const addRangeToUnit = (unitId: string, checkIn: string, checkOut: string) => {
+        if (!unitId) return;
+        const ci = parseDate(checkIn);
+        const co = parseDate(checkOut);
+        if (!ci || !co) return;
+        let unitSet = bookedDaysByUnitId.get(unitId);
+        if (!unitSet) {
+          unitSet = new Set<string>();
+          bookedDaysByUnitId.set(unitId, unitSet);
+        }
+        for (let yy = ci.y, mm = ci.m, dd = ci.d; yy < co.y || mm < co.m || dd < co.d; ) {
+          const dayStr = dateToStr(yy, mm, dd);
+          if (dayStr >= monthStartStr && dayStr <= monthEndStr) unitSet.add(dayStr);
+          dd++;
+          if (dd > new Date(yy, mm + 1, 0).getDate()) {
+            dd = 1;
+            mm++;
+            if (mm > 11) {
+              mm = 0;
+              yy++;
+            }
           }
-        });
+        }
+      };
+      occupancyBookings.forEach((b: any) => addRangeToUnit(b.unit_id, b.check_in_date, b.check_out_date));
+      customOffers.forEach((o: any) => addRangeToUnit(o.unit_id, o.check_in_date, o.check_out_date));
 
-        let totalBookedDays = 0;
-        bookedDatesByUnit.forEach(set => { totalBookedDays += set.size; });
-        const totalUnitDays = totalUnits * daysInMonth;
-        const occupancyPercentage = totalUnitDays > 0 ? Math.round((totalBookedDays / totalUnitDays) * 100) : 0;
+      const occupancyByProperty = units.map((unit: any) => {
+        const bookedDays = bookedDaysByUnitId.get(unit.id)?.size ?? 0;
+        const occupancyPercentage = daysInMonth > 0 ? Math.round((bookedDays / daysInMonth) * 100) : 0;
         return {
-          id: property.id,
-          name: property.name,
-          units: totalUnits,
-          occupancyPercentage,
-          bookedDays: totalBookedDays,
-          daysInMonth
+          id: unit.id,
+          name: unit.name,
+          bookedDays,
+          daysInMonth,
+          occupancyPercentage
         };
       });
 

@@ -3,6 +3,8 @@ import { apiUrl } from "@/lib/api";
 import {
   BarChart3,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   DollarSign,
   Users,
   Settings,
@@ -937,6 +939,11 @@ export default function Admin() {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
+  const [occupancyMonth, setOccupancyMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
   useEffect(() => {
     // Check if admin is logged in
     const admin = localStorage.getItem("admin");
@@ -949,20 +956,19 @@ export default function Admin() {
     fetchStats();
   }, [navigate]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (monthOverride?: { year: number; month: number }) => {
+    if (!monthOverride) setLoading(true);
+    const m = monthOverride ?? occupancyMonth;
     try {
-      console.log("🔍 [ADMIN CLIENT] Fetching stats from server...");
-      const response = await fetch(apiUrl("/api/admin/stats"));
+      const params = new URLSearchParams({ year: String(m.year), month: String(m.month + 1) });
+      const response = await fetch(apiUrl(`/api/admin/stats?${params}`));
       
       if (response.ok) {
         const response_data = await response.json();
-        console.log("✅ [ADMIN CLIENT] Stats received:", response_data);
         setStats(response_data.data || response_data);
-      } else {
-        console.error("❌ [ADMIN CLIENT] Failed to fetch stats:", response.status);
       }
     } catch (error) {
-      console.error("❌ [ADMIN CLIENT] Network error:", error);
+      console.error("Failed to fetch stats:", error);
     } finally {
       setLoading(false);
     }
@@ -1133,15 +1139,47 @@ export default function Admin() {
                 </div>
 
                 <div className="bg-card border border-border rounded-lg p-6">
-                  <h3 className="text-lg font-bold text-foreground mb-1">
-                    {t("admin.occupancyByProperty")}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {new Date().toLocaleDateString(
-                      language === "el" ? "el-GR" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : "en-US",
-                      { month: "long", year: "numeric" }
-                    )}
-                  </p>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-foreground">
+                      {t("admin.occupancyByProperty")}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prev = occupancyMonth.month === 0
+                            ? { year: occupancyMonth.year - 1, month: 11 }
+                            : { year: occupancyMonth.year, month: occupancyMonth.month - 1 };
+                          setOccupancyMonth(prev);
+                          fetchStats(prev);
+                        }}
+                        className="p-1 rounded hover:bg-muted"
+                        aria-label="Previous month"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <span className="text-sm font-medium min-w-[140px] text-center">
+                        {new Date(occupancyMonth.year, occupancyMonth.month).toLocaleDateString(
+                          language === "el" ? "el-GR" : language === "fr" ? "fr-FR" : language === "de" ? "de-DE" : "en-US",
+                          { month: "long", year: "numeric" }
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = occupancyMonth.month === 11
+                            ? { year: occupancyMonth.year + 1, month: 0 }
+                            : { year: occupancyMonth.year, month: occupancyMonth.month + 1 };
+                          setOccupancyMonth(next);
+                          fetchStats(next);
+                        }}
+                        className="p-1 rounded hover:bg-muted"
+                        aria-label="Next month"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="space-y-4">
                     {loading ? (
                       <p className="text-muted-foreground">{t("admin.loadingOccupancy")}</p>
