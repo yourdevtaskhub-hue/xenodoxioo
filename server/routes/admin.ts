@@ -96,11 +96,13 @@ router.get("/stats", async (req, res) => {
       throw new Error("Database query failed");
     }
     
+    const ACTIVE_STATUSES = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
+    const activeBookings = bookings?.filter((b: { status: string }) => ACTIVE_STATUSES.includes(b.status)) || [];
     const totalBookings = bookings?.length || 0;
-    const confirmedBookings = bookings?.filter(b => b.status === 'CONFIRMED').length || 0;
-    const pendingBookings = bookings?.filter(b => b.status === 'PENDING').length || 0;
-    const cancelledBookings = bookings?.filter(b => b.status === 'CANCELLED').length || 0;
-    const totalRevenue = bookings?.reduce((sum, b) => sum + (parseFloat(b.total_paid) || 0), 0) || 0;
+    const confirmedBookings = activeBookings.length;
+    const pendingBookings = bookings?.filter((b: { status: string }) => b.status === 'PENDING').length || 0;
+    const cancelledBookings = bookings?.filter((b: { status: string }) => b.status === 'CANCELLED').length || 0;
+    const totalRevenue = activeBookings.reduce((sum: number, b: { total_paid?: string; total_price?: string }) => sum + (parseFloat(b.total_paid as string) || parseFloat(b.total_price as string) || 0), 0) || 0;
     const totalUsers = users?.length || 0;
     const propertiesCount = properties?.length || 0;
 
@@ -131,8 +133,8 @@ router.get("/stats", async (req, res) => {
         bookedDatesByUnit.set(u.id, new Set());
       });
 
-      const confirmedBookings = bookings?.filter((b: { status: string }) => b.status === 'CONFIRMED') || [];
-      confirmedBookings.forEach((booking: { unit_id: string; check_in_date: string; check_out_date: string }) => {
+      const confirmedForOccupancy = bookings?.filter((b: { status: string }) => ACTIVE_STATUSES.includes(b.status)) || [];
+      confirmedForOccupancy.forEach((booking: { unit_id: string; check_in_date: string; check_out_date: string }) => {
         const unitSet = bookedDatesByUnit.get(booking.unit_id);
         if (!unitSet) return;
 

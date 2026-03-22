@@ -2301,10 +2301,10 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
       };
     }
 
-    // GET /api/admin/stats
+    // GET /api/admin/stats (includes custom URL / offer bookings)
     if (path === '/api/admin/stats' && method === 'GET') {
       const [bookingsResult, usersResult, propertiesResult, inquiriesRpcResult] = await Promise.all([
-        supabase.from('bookings').select('status, unit_id, check_in_date, check_out_date, total_paid'),
+        supabase.from('bookings').select('status, unit_id, check_in_date, check_out_date, total_paid, total_price'),
         supabase.from('users').select('id, status', { count: 'exact' }),
         supabase.from('properties').select(`
           id,
@@ -2319,8 +2319,11 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
       const properties = propertiesResult.data || [];
       const totalUsers = usersResult.count ?? users.length;
 
-      const confirmedBookings = bookings.filter((b: any) => b.status === 'CONFIRMED');
-      const totalRevenue = bookings.reduce((sum: any, b: any) => sum + (parseFloat(b.total_paid) || parseFloat(b.total_price) || 0), 0);
+      const ACTIVE_STATUSES = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
+      const confirmedBookings = bookings.filter((b: any) => ACTIVE_STATUSES.includes(b.status));
+      const totalRevenue = bookings
+        .filter((b: any) => ACTIVE_STATUSES.includes(b.status))
+        .reduce((sum: any, b: any) => sum + (parseFloat(b.total_paid) || parseFloat(b.total_price) || 0), 0);
 
       const now = new Date();
       const year = now.getFullYear();
