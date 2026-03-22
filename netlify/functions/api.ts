@@ -23,8 +23,12 @@ export const handler = async (event: any, context: any) => {
   console.log(`📝 [${requestId}] ${event.httpMethod || 'GET'} ${event.path || event.rawPath || ''}`);
   
   try {
-    // Get the path from the event
-    const path = event.path || event.rawPath || '';
+    // Get the path from the event (production rewrite may send /.netlify/functions/api/...)
+    let path = (event.headers?.['x-netlify-original-pathname'] || event.headers?.['X-Netlify-Original-Pathname'] || event.path || event.rawPath || '');
+    if (typeof path === 'string') path = path.split('?')[0];
+    if (path.startsWith('/.netlify/functions/api')) {
+      path = '/api' + path.slice('/.netlify/functions/api'.length) || '/api';
+    }
     const method = event.httpMethod || 'GET';
     
     console.log(`📝 [${requestId}] ${method} ${path}`);
