@@ -2,7 +2,8 @@
  * iCal two-way sync: generate ICS feed (export) and parse/import from OTAs.
  */
 import icalGenerator, { ICalCalendarMethod, ICalEventStatus } from "ical-generator";
-import * as nodeIcal from "node-ical";
+// node-ical uses CJS; sync.parseICS is the synchronous parser
+import ical from "node-ical";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const BLOCKING_STATUSES = ["CONFIRMED", "COMPLETED", "CHECKED_IN", "CHECKED_OUT", "NO_SHOW"];
@@ -79,7 +80,7 @@ async function fetchAndParseICS(url: string): Promise<{ uid: string; start: Date
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
   const text = await res.text();
-  const parsed = nodeIcal.parseICS(text);
+  const parsed = ical.sync.parseICS(text);
 
   const events: { uid: string; start: Date; end: Date }[] = [];
   for (const key of Object.keys(parsed)) {
