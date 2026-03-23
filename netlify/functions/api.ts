@@ -79,9 +79,10 @@ export const handler = async (event: any, context: any) => {
     }
 
     // GET /api/ical/feed/:unitSlug — ICS export for OTA import (Airbnb/Booking paste this URL)
-    const icalFeedMatch = path.match(/^\/api\/ical\/feed\/([^/]+)$/);
+    // Support both /lykoskufi-1 and /lykoskufi-1.ics (Booking.com may require .ics suffix)
+    const icalFeedMatch = path.match(/^\/api\/ical\/feed\/([^/]+?)(\.ics)?$/);
     if (icalFeedMatch && method === 'GET') {
-      const unitSlug = icalFeedMatch[1];
+      const unitSlug = icalFeedMatch[1].replace(/\.ics$/i, '');
       const token = event.queryStringParameters?.token;
       const secret = process.env.ICAL_EXPORT_SECRET;
       if (!secret || token !== secret) {
@@ -107,8 +108,12 @@ export const handler = async (event: any, context: any) => {
           body: ics
         };
       } catch (err: any) {
-        console.error(`❌ [${requestId}] ICS export error:`, err);
-        return { statusCode: 500, headers: { 'Content-Type': 'text/plain' }, body: err?.message || 'Internal error' };
+        console.error(`❌ [${requestId}] ICS export error:`, err?.message || err);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'text/plain' },
+          body: err?.message || 'Internal error'
+        };
       }
     }
 
