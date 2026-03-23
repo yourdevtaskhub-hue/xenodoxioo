@@ -98,7 +98,13 @@ export function createServer() {
     cors({
       origin:
         process.env.NODE_ENV === "production" && process.env.FRONTEND_URL
-          ? [process.env.FRONTEND_URL, "https://www.leonidion-houses.com", "https://leonidion-houses.com"]
+          ? [
+              process.env.FRONTEND_URL,
+              "https://www.leonidionhouses.com",
+              "https://leonidionhouses.com",
+              "https://www.leonidion-houses.com",
+              "https://leonidion-houses.com",
+            ]
           : true,
       credentials: true,
     }),

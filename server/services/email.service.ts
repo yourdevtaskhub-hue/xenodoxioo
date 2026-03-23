@@ -2,14 +2,14 @@ import { Resend } from "resend";
 import { supabase } from "../lib/db";
 
 const FROM_EMAIL =
-  process.env.FROM_EMAIL || "noreply@leonidion-houses.com";
+  process.env.FROM_EMAIL || "noreply@leonidionhouses.com";
 const FROM_NAME = process.env.FROM_NAME || "LEONIDIONHOUSES";
 
 function getFrontendUrl(): string {
   return (
     process.env.FRONTEND_URL ||
     (process.env.NODE_ENV === "production"
-      ? "https://www.leonidion-houses.com"
+      ? "https://www.leonidionhouses.com"
       : "http://localhost:8080")
   );
 }

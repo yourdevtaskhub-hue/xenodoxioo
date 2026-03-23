@@ -72,7 +72,7 @@ async function processOfferPayment(
   const { error: guestErr } = await supabase.from("users").upsert(
     {
       id: GUEST_USER_ID,
-      email: "guest-system@leonidion-houses.com",
+      email: "guest-system@leonidionhouses.com",
       first_name: "Guest",
       last_name: "User",
       password: "no-login-placeholder",
@@ -199,7 +199,7 @@ async function processOfferPayment(
 
   await supabase.from("pending_offer_checkouts").delete().eq("id", pending.id);
 
-  const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
+  const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidionhouses.com";
   const { data: fullBooking } = await supabase
     .from("bookings")
     .select("*, unit:units(*, property:properties(*))")
@@ -321,7 +321,7 @@ async function processSuccessfulPayment(
   await supabase.from("bookings").update(update).eq("id", booking.id);
 
   // Send emails via Resend
-  const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
+  const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidionhouses.com";
   const unit = booking.unit as any;
   const property = unit?.property;
   const bookingForEmail = {

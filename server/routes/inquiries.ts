@@ -70,7 +70,7 @@ router.post("/", validate(createInquirySchema), async (req, res, next) => {
     await supabase.from("inquiries").update({ last_guest_message_at: new Date().toISOString() }).eq("id", inquiry.id);
 
     // Send email notification to admin
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@leonidion-houses.com";
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@leonidionhouses.com";
     const { data: property } = await supabase
       .from("properties")
       .select("name")
@@ -261,7 +261,7 @@ router.post("/admin/:id/custom-offer", validate(customOfferSchema), async (req, 
       customTotalEur,
     );
 
-    const baseUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
+    const baseUrl = process.env.FRONTEND_URL || "https://www.leonidionhouses.com";
     const checkoutUrl = `${baseUrl}/checkout?offer=${offer.token}`;
 
     res.json({

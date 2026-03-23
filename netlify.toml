@@ -57,6 +57,31 @@
   status = 200
   to = "/uploads/:splat"
 
+# Domain migration: 301 redirect old domain → new domain (must come before SPA fallback)
+[[redirects]]
+  from = "https://leonidion-houses.com"
+  to = "https://www.leonidionhouses.com"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://leonidion-houses.com/*"
+  to = "https://www.leonidionhouses.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.leonidion-houses.com"
+  to = "https://www.leonidionhouses.com"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.leonidion-houses.com/*"
+  to = "https://www.leonidionhouses.com/:splat"
+  status = 301
+  force = true
+
 # SPA fallback: routes without a matching file serve index.html (fixes /admin, /about, /contact)
 [[redirects]]
   from = "/*"

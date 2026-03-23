@@ -4,7 +4,7 @@
 
 -- Ensure guest user exists (required for payments.user_id FK on offer bookings)
 INSERT INTO public.users (id, email, first_name, last_name, password, role, status)
-VALUES ('00000000-0000-0000-0000-000000000001', 'guest-system@leonidion-houses.com', 'Guest', 'User', 'no-login-placeholder', 'CUSTOMER', 'INACTIVE')
+VALUES ('00000000-0000-0000-0000-000000000001', 'guest-system@leonidionhouses.com', 'Guest', 'User', 'no-login-placeholder', 'CUSTOMER', 'INACTIVE')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.custom_checkout_offers (

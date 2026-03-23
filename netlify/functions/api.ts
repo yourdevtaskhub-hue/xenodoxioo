@@ -1048,7 +1048,7 @@ export const handler = async (event: any, context: any) => {
         try {
           const { Resend } = await import('resend');
           const resend = new Resend(apiKey);
-          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'noreply@leonidion-houses.com'}>`;
+          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'noreply@leonidionhouses.com'}>`;
           const unit = (updated as any)?.unit;
           const property = unit?.property;
           const checkInStr = updated.check_in_date ? new Date(updated.check_in_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -1301,7 +1301,7 @@ export const handler = async (event: any, context: any) => {
           }
 
           const { error: guestErr } = await supabase.from('users').upsert(
-            { id: GUEST_USER_ID, email: 'guest-system@leonidion-houses.com', first_name: 'Guest', last_name: 'User', password: 'no-login-placeholder', role: 'CUSTOMER', status: 'INACTIVE' },
+            { id: GUEST_USER_ID, email: 'guest-system@leonidionhouses.com', first_name: 'Guest', last_name: 'User', password: 'no-login-placeholder', role: 'CUSTOMER', status: 'INACTIVE' },
             { onConflict: 'id' }
           );
           if (guestErr) console.warn('[API] Guest user upsert:', guestErr.message);
@@ -1392,9 +1392,9 @@ export const handler = async (event: any, context: any) => {
           await supabase.from('custom_checkout_offers').update({ used_at: new Date().toISOString() }).eq('token', pending.offer_token);
           await supabase.from('pending_offer_checkouts').delete().eq('id', pending.id);
 
-          const frontendUrl = process.env.FRONTEND_URL || 'https://www.leonidion-houses.com';
+          const frontendUrl = process.env.FRONTEND_URL || 'https://www.leonidionhouses.com';
           const apiKey = process.env.RESEND_API_KEY;
-          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'noreply@leonidion-houses.com'}>`;
+          const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'noreply@leonidionhouses.com'}>`;
           const viewUrl = `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || '')}`;
           const cancelUrl = cancellationToken ? `${frontendUrl}/cancel-booking?token=${encodeURIComponent(cancellationToken)}` : null;
           const checkInStr = checkIn.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1896,7 +1896,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         message,
       });
       await supabase.from('inquiries').update({ last_guest_message_at: new Date().toISOString() }).eq('id', inquiry.id);
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@leonidion-houses.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@leonidionhouses.com';
       const { data: property } = await supabase.from('properties').select('name').eq('id', propertyId).single();
       const propertyName = property?.name || 'Property';
       const apiKey = process.env.RESEND_API_KEY;
@@ -1904,7 +1904,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         const Resend = (await import('resend')).Resend;
         const resend = new Resend(apiKey);
         const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`;
-        const dashboardUrl = `${process.env.FRONTEND_URL || 'https://www.leonidion-houses.com'}/admin/inquiries`;
+        const dashboardUrl = `${process.env.FRONTEND_URL || 'https://www.leonidionhouses.com'}/admin/inquiries`;
         const html = `
           <h1>New Inquiry Received</h1>
           <p>A new inquiry has been submitted for <strong>${propertyName}</strong>.</p>
@@ -2144,7 +2144,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
       if (offerErr || !offer) {
         return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: 'Failed to create offer' }) };
       }
-      const baseUrl = process.env.FRONTEND_URL || 'https://www.leonidion-houses.com';
+      const baseUrl = process.env.FRONTEND_URL || 'https://www.leonidionhouses.com';
       const checkoutUrl = `${baseUrl}/checkout?offer=${token}`;
       return {
         statusCode: 200,
@@ -2201,7 +2201,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         const Resend = (await import('resend')).Resend;
         const resend = new Resend(apiKey);
         const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`;
-        const inquiryUrl = `${process.env.FRONTEND_URL || 'https://www.leonidion-houses.com'}/inquiry/${id}?email=${encodeURIComponent(inquiry.guest_email)}`;
+        const inquiryUrl = `${process.env.FRONTEND_URL || 'https://www.leonidionhouses.com'}/inquiry/${id}?email=${encodeURIComponent(inquiry.guest_email)}`;
         const html = `
           <h1>Reply to Your Inquiry</h1>
           <p>Dear ${inquiry.guest_name},</p>

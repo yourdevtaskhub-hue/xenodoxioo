@@ -94,8 +94,8 @@ export const handler = async (event: any) => {
 
         if (fullBooking) {
           const resend = new Resend(apiKey);
-          const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "noreply@leonidion-houses.com"}>`;
-          const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidion-houses.com";
+          const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "noreply@leonidionhouses.com"}>`;
+          const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidionhouses.com";
           const unit = fullBooking.unit as any;
           const property = unit?.property;
           const GUEST_USER_ID = "00000000-0000-0000-0000-000000000001";

@@ -12,7 +12,7 @@ INSERT INTO public.users (
   status
 ) VALUES (
   '00000000-0000-0000-0000-000000000001',
-  'guest-system@leonidion-houses.com',
+  'guest-system@leonidionhouses.com',
   'Guest',
   'User',
   'no-login-placeholder',
