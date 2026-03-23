@@ -105,6 +105,20 @@ export async function checkAvailability(
     return { isAvailable: false, reason: "Dates are already booked" };
   }
 
+  // External bookings (Airbnb/Booking iCal sync) — block overlapping dates
+  const checkInStr = checkInDate.toISOString().slice(0, 10);
+  const checkOutStr = checkOutDate.toISOString().slice(0, 10);
+  const { data: externalConflict } = await supabase
+    .from("external_bookings")
+    .select("id")
+    .eq("unit_id", resolvedId)
+    .lt("start_date", checkOutStr)
+    .gt("end_date", checkInStr);
+
+  if (externalConflict && externalConflict.length > 0) {
+    return { isAvailable: false, reason: "Dates are already booked (external)" };
+  }
+
   const { data: blockages } = await supabase
     .from("date_blockages")
     .select("id")
@@ -545,6 +559,15 @@ export async function getAvailableUnits(
     .lt("check_in_date", checkOut)
     .gt("check_out_date", checkIn);
 
-  const bookedUnitIds = new Set((conflicting || []).map((b) => b.unit_id));
+  const { data: externalConflicting } = await supabase
+    .from("external_bookings")
+    .select("unit_id")
+    .lt("start_date", checkOut)
+    .gt("end_date", checkIn);
+
+  const bookedUnitIds = new Set([
+    ...(conflicting || []).map((b) => b.unit_id),
+    ...(externalConflicting || []).map((b) => b.unit_id),
+  ]);
   return units.filter((u) => !bookedUnitIds.has(u.id));
 }

@@ -59,6 +59,59 @@ export const handler = async (event: any, context: any) => {
 
     console.log(`✅ [${requestId}] Connected to Supabase`);
 
+    // GET/POST /api/ical/sync — manual trigger for iCal import (e.g. cron-job.org). Requires ICAL_SYNC_SECRET.
+    if ((path === '/api/ical/sync' || path === '/ical/sync') && (method === 'GET' || method === 'POST')) {
+      const token = event.queryStringParameters?.token;
+      if (token !== process.env.ICAL_SYNC_SECRET) {
+        return { statusCode: 401, headers: { 'Content-Type': 'text/plain' }, body: 'Unauthorized' };
+      }
+      try {
+        const { syncExternalCalendars } = await import('../../server/services/ical.service');
+        const { ok, failed } = await syncExternalCalendars(supabase);
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, ok, failed })
+        };
+      } catch (err: any) {
+        return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: false, error: err?.message }) };
+      }
+    }
+
+    // GET /api/ical/feed/:unitSlug — ICS export for OTA import (Airbnb/Booking paste this URL)
+    const icalFeedMatch = path.match(/^\/api\/ical\/feed\/([^/]+)$/);
+    if (icalFeedMatch && method === 'GET') {
+      const unitSlug = icalFeedMatch[1];
+      const token = event.queryStringParameters?.token;
+      const secret = process.env.ICAL_EXPORT_SECRET;
+      if (!secret || token !== secret) {
+        return {
+          statusCode: 401,
+          headers: { 'Content-Type': 'text/plain' },
+          body: 'Unauthorized'
+        };
+      }
+      try {
+        const { data: unit } = await supabase.from('units').select('id').eq('slug', unitSlug).single();
+        if (!unit) {
+          return { statusCode: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Unit not found' };
+        }
+        const { generateICSForUnit } = await import('../../server/services/ical.service');
+        const ics = await generateICSForUnit(supabase, unit.id);
+        return {
+          statusCode: 200,
+          headers: {
+            'Content-Type': 'text/calendar; charset=utf-8',
+            'Cache-Control': 'public, max-age=300'
+          },
+          body: ics
+        };
+      } catch (err: any) {
+        console.error(`❌ [${requestId}] ICS export error:`, err);
+        return { statusCode: 500, headers: { 'Content-Type': 'text/plain' }, body: err?.message || 'Internal error' };
+      }
+    }
+
     // Route handling
     if (path === '/api/properties' || path === '/properties') {
       // Fetch properties with units
@@ -369,39 +422,44 @@ export const handler = async (event: any, context: any) => {
     }
 
     // GET /api/bookings/occupied-dates - blocked dates for calendar (CRITICAL: prevents double booking)
+    // Includes internal bookings + external (Airbnb/Booking) blockages
     if ((path === '/api/bookings/occupied-dates' || path === '/bookings/occupied-dates') && method === 'GET') {
-      const unitId = event.queryStringParameters?.unitId?.trim();
-      if (!unitId) {
+      const unitIdParam = event.queryStringParameters?.unitId?.trim();
+      if (!unitIdParam) {
         return {
           statusCode: 400,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ success: false, error: 'unitId required' })
         };
       }
-      const BLOCKING_STATUSES = ['CONFIRMED', 'COMPLETED', 'CHECKED_IN', 'CHECKED_OUT', 'NO_SHOW'];
-      const { data: ranges, error } = await supabase
-        .from('bookings')
-        .select('check_in_date, check_out_date')
-        .eq('unit_id', unitId)
-        .in('status', BLOCKING_STATUSES)
-        .order('check_in_date', { ascending: true });
-
-      if (error) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(unitIdParam);
+      let unitId = unitIdParam;
+      if (!isUuid) {
+        const { data: unit } = await supabase.from('units').select('id').eq('slug', unitIdParam).single();
+        if (!unit) {
+          return {
+            statusCode: 404,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: 'Unit not found' })
+          };
+        }
+        unitId = unit.id;
+      }
+      try {
+        const { getOccupiedDateRangesIncludingExternal } = await import('../../server/services/ical.service');
+        const ranges = await getOccupiedDateRangesIncludingExternal(supabase, unitId);
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, data: ranges })
+        };
+      } catch (err: any) {
         return {
           statusCode: 500,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: false, error: error.message })
+          body: JSON.stringify({ success: false, error: err?.message || 'Failed to fetch occupied dates' })
         };
       }
-      const mapped = (ranges || []).map((r: { check_in_date: string; check_out_date: string }) => ({
-        start: (r.check_in_date || '').slice(0, 10),
-        end: (r.check_out_date || '').slice(0, 10),
-      }));
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: true, data: mapped })
-      };
     }
 
     // GET /api/bookings/user - user's bookings (requires auth)

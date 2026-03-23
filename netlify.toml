@@ -9,6 +9,10 @@
   node_bundler = "esbuild"
   included_files = ["./Πίνακας Τιμών Δωματίων.txt"]
 
+# iCal sync: import Airbnb/Booking feeds every 15 min
+[functions."ical-sync-scheduled"]
+  schedule = "*/15 * * * *"
+
 # Payment routes → dedicated functions (must come before generic /api/*)
 [[redirects]]
   force = true
