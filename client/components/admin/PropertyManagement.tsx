@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { normalizeUnitImageList } from "@shared/normalize-unit-images";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import { Plus, Edit, Trash2, BedDouble, Image as ImageIcon } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -232,7 +233,7 @@ export default function PropertyManagement() {
           mainImageUrl = uploadJson.imageUrl;
         } else {
           console.error("[UPDATE PROPERTY] Upload failed:", uploadJson);
-          alert(uploadJson?.error || "Failed to upload image");
+          alert(uploadJson?.error || uploadJson?.message || "Failed to upload image");
           setUpdatingProperty(false);
           return;
         }
@@ -258,6 +259,54 @@ export default function PropertyManagement() {
         responseData = {};
       }
       if (response.ok) {
+        const propUnits = units.filter(
+          (u) =>
+            (u as { propertyId?: string; property_id?: string }).propertyId === editingProperty.id ||
+            (u as { property_id?: string }).property_id === editingProperty.id,
+        );
+        if (propUnits.length === 1 && mainImageUrl) {
+          const u = propUnits[0] as {
+            id: string;
+            name: string;
+            description?: string;
+            maxGuests?: number;
+            max_guests?: number;
+            bedrooms?: number;
+            bathrooms?: number;
+            basePrice?: number;
+            base_price?: number;
+            cleaningFee?: number;
+            cleaning_fee?: number;
+            minStayDays?: number;
+            min_stay_days?: number;
+            images?: unknown;
+          };
+          const existing = normalizeUnitImageList(u.images);
+          const nextImages = [mainImageUrl, ...existing.filter((x) => x !== mainImageUrl)];
+          try {
+            const syncRes = await fetch(apiUrl(`/api/admin/units/${u.id}`), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                propertyId: editingProperty.id,
+                name: u.name,
+                description: u.description ?? "",
+                maxGuests: u.maxGuests ?? u.max_guests ?? 2,
+                bedrooms: u.bedrooms ?? 1,
+                bathrooms: u.bathrooms ?? 1,
+                basePrice: u.basePrice ?? u.base_price ?? 100,
+                cleaningFee: u.cleaningFee ?? u.cleaning_fee ?? 0,
+                minStayDays: u.minStayDays ?? u.min_stay_days ?? 1,
+                images: nextImages,
+              }),
+            });
+            if (!syncRes.ok) {
+              console.warn("[UPDATE PROPERTY] Could not sync unit gallery with new property main image");
+            }
+          } catch (e) {
+            console.warn("[UPDATE PROPERTY] Unit sync error:", e);
+          }
+        }
         setShowPropertyForm(false);
         setEditingProperty(null);
         fetchData();
@@ -430,6 +479,33 @@ export default function PropertyManagement() {
       });
 
       if (response.ok) {
+        const prop = properties.find((p) => p.id === propId);
+        const siblings = units.filter(
+          (u) =>
+            (u as { propertyId?: string; property_id?: string }).propertyId === propId ||
+            (u as { property_id?: string }).property_id === propId,
+        );
+        if (prop && siblings.length === 1 && body.images?.[0]) {
+          try {
+            const syncRes = await fetch(apiUrl(`/api/admin/properties/${propId}`), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: prop.name,
+                description: prop.description ?? "",
+                location: prop.location ?? "",
+                city: prop.city,
+                country: prop.country ?? "Greece",
+                main_image: body.images[0],
+              }),
+            });
+            if (!syncRes.ok) {
+              console.warn("[UPDATE UNIT] Could not sync property main image from unit gallery order");
+            }
+          } catch (e) {
+            console.warn("[UPDATE UNIT] Property sync error:", e);
+          }
+        }
         console.log("[UPDATE UNIT] SUCCESS");
         setShowUnitForm(false);
         setEditingUnit(null);
@@ -734,17 +810,7 @@ function PropertyForm({ property, onSubmit, onClose, updating = false }: any) {
 // Unit Form Component
 function UnitForm({ unit, propertyId, properties, onSubmit, onClose, onPropertyChange, updating = false }: any) {
   const { t } = useLanguage();
-  const parseImages = (v: string | string[] | undefined): string[] => {
-    if (!v) return [];
-    if (Array.isArray(v)) return v;
-    try {
-      const parsed = JSON.parse(v);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  };
-  const existingImgs = parseImages(unit?.images);
+  const existingImgs = normalizeUnitImageList(unit?.images);
   const [formData, setFormData] = useState({
     name: unit?.name ?? "",
     description: unit?.description ?? "",

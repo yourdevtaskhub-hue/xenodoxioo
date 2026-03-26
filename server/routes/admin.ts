@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { normalizeUnitImageList } from "../../shared/normalize-unit-images";
 import { supabase } from "../lib/db";
 import multer from "multer";
 import path from "path";
@@ -1060,20 +1061,7 @@ router.get("/units", async (req, res) => {
 
     // Transform the data to match the expected interface
     const transformedUnits = units?.map(unit => {
-      // Parse images JSON string to array
-      let parsedImages = [];
-      if (unit.images) {
-        try {
-          if (typeof unit.images === 'string') {
-            parsedImages = JSON.parse(unit.images);
-          } else if (Array.isArray(unit.images)) {
-            parsedImages = unit.images;
-          }
-        } catch (error) {
-          console.log("⚠️ [UNITS] Failed to parse images for unit:", unit.id, error);
-          parsedImages = [];
-        }
-      }
+      const parsedImages = normalizeUnitImageList(unit.images);
 
       return {
         ...unit,
@@ -1583,59 +1571,90 @@ router.put("/settings/payment", async (req, res) => {
   }
 });
 
-// Image Upload Route
+// Image Upload Route — JSON base64 (admin PropertyManagement / units) or multipart file (legacy)
 router.post("/upload-image", (req, res) => {
   try {
+    const base64Data = req.body?.base64Data;
+    if (typeof base64Data === "string" && base64Data.length > 0) {
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const rawName = req.body?.filename;
+      const safeName =
+        typeof rawName === "string" && rawName.trim().length > 0
+          ? path.basename(rawName.trim())
+          : `file-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+      const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, "");
+      let buffer: Buffer;
+      try {
+        buffer = Buffer.from(base64Content, "base64");
+      } catch {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid base64 image", error: "Invalid base64 image" });
+      }
+      if (!buffer.length) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Empty image data", error: "Empty image data" });
+      }
+      fs.writeFileSync(path.join(uploadsDir, safeName), buffer);
+      const imageUrl = `/uploads/${safeName}`;
+      console.log("✅ Image uploaded (base64):", imageUrl);
+      return res.json({ success: true, imageUrl, filename: safeName });
+    }
+
     const upload = req.app.locals.uploadAny;
-    
+
     upload(req, res, (err: any) => {
       if (err) {
         console.error("❌ Upload error:", err);
-        return res.status(400).json({ 
-          success: false, 
-          message: err.message || "Upload failed" 
+        return res.status(400).json({
+          success: false,
+          message: err.message || "Upload failed",
         });
       }
-      
+
       console.log("📁 Upload request files:", req.files);
       console.log("📁 Upload request body:", req.body);
-      
+
       if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "No file uploaded" 
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
         });
       }
-      
+
       const file = Array.isArray(req.files) ? req.files[0] : req.files.file;
       if (!file) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "No valid file found" 
+        return res.status(400).json({
+          success: false,
+          message: "No valid file found",
         });
       }
-      
+
       const imageUrl = `/uploads/${(file as any).filename}`;
-      
+
       console.log("✅ Image uploaded:", imageUrl);
       console.log("📁 File details:", {
         filename: (file as any).filename,
         originalname: (file as any).originalname,
         size: (file as any).size,
-        mimetype: (file as any).mimetype
+        mimetype: (file as any).mimetype,
       });
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         imageUrl: imageUrl,
-        filename: (file as any).filename
+        filename: (file as any).filename,
       });
     });
   } catch (error) {
     console.error("❌ Upload route error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Upload failed" 
+    res.status(500).json({
+      success: false,
+      message: "Upload failed",
     });
   }
 });

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { normalizeUnitImageList } from "../../shared/normalize-unit-images";
 import { supabase } from "../lib/db";
 import { getMinimumPriceForRoomInPeriod, getRoomClosedStatusAndReopenDate } from "../services/price-table.service";
 
@@ -37,18 +38,7 @@ router.get("/", async (_req, res, next) => {
 
       // Parse unit images
       const parsedUnits = propertyUnits.map(unit => {
-        let parsedImages = [];
-        if (unit.images) {
-          try {
-            if (typeof unit.images === 'string') {
-              parsedImages = JSON.parse(unit.images);
-            } else if (Array.isArray(unit.images)) {
-              parsedImages = unit.images;
-            }
-          } catch {
-            parsedImages = [];
-          }
-        }
+        const parsedImages = normalizeUnitImageList(unit.images);
 
         const basePrice = getMinimumPriceForRoomInPeriod(unit.name) ?? (Number(unit.base_price) || 0);
         const { closed: closedForCurrentPeriod, reopenDate } = getRoomClosedStatusAndReopenDate(unit.name);
@@ -132,19 +122,7 @@ router.get("/:slug", async (req, res, next) => {
 
     // Transform units to match frontend expectations (use price table for basePrice)
     const transformedUnits = (units || []).map(unit => {
-      let parsedImages = [];
-      if (unit.images) {
-        try {
-          if (typeof unit.images === 'string') {
-            parsedImages = JSON.parse(unit.images);
-          } else if (Array.isArray(unit.images)) {
-            parsedImages = unit.images;
-          }
-        } catch (error) {
-          console.log("⚠️ [PROPERTIES] Failed to parse images for unit:", unit.id, error);
-          parsedImages = [];
-        }
-      }
+      const parsedImages = normalizeUnitImageList(unit.images);
       const basePrice = getMinimumPriceForRoomInPeriod(unit.name) ?? (Number(unit.base_price) || 0);
       return {
         ...unit,
@@ -218,18 +196,7 @@ router.get("/id/:id", async (req, res) => {
       gallery_images: property.gallery_images || [],
       // Transform units to match frontend expectations
       units: (units || []).map(unit => {
-        let parsedImages = [];
-        if (unit.images) {
-          try {
-            if (typeof unit.images === 'string') {
-              parsedImages = JSON.parse(unit.images);
-            } else if (Array.isArray(unit.images)) {
-              parsedImages = unit.images;
-            }
-          } catch {
-            parsedImages = [];
-          }
-        }
+        const parsedImages = normalizeUnitImageList(unit.images);
         const basePrice = getMinimumPriceForRoomInPeriod(unit.name) ?? (Number(unit.base_price) || 0);
         const { closed: closedForCurrentPeriod, reopenDate } = getRoomClosedStatusAndReopenDate(unit.name);
         return {

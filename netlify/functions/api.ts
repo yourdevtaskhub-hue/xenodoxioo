@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { normalizeUnitImageList } from '../../shared/normalize-unit-images';
 
 /** Effective max guests per unit. Small/Big Bungalow & Lykoskufi 1 = 3, Lykoskufi 2 = 5, others from DB. */
 function getEffectiveMaxGuests(unitName: string, dbMaxGuests: number): number {
@@ -199,7 +200,7 @@ export const handler = async (event: any, context: any) => {
             const { closed: closedForCurrentPeriod, reopenDate } = getClosed(unit.name);
             return {
               ...unit,
-              images: unit.images ? (typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images) : [],
+              images: normalizeUnitImageList(unit.images),
               propertyId: unit.property_id,
               maxGuests: unit.max_guests,
               bedrooms: unit.bedrooms,
@@ -280,12 +281,7 @@ export const handler = async (event: any, context: any) => {
         ...property,
         gallery_images: property.gallery_images || [],
         units: (units || []).map((unit: any) => {
-          let parsedImages = [];
-          if (unit.images) {
-            try {
-              parsedImages = typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images;
-            } catch {}
-          }
+          const parsedImages = normalizeUnitImageList(unit.images);
           const basePrice = getMinPrice(unit.name) ?? (Number(unit.base_price) || 0);
           const { closed: closedForCurrentPeriod, reopenDate } = getClosed(unit.name);
           return {
@@ -366,12 +362,7 @@ export const handler = async (event: any, context: any) => {
         ...property,
         gallery_images: property.gallery_images || [],
         units: (units || []).map((unit: any) => {
-          let parsedImages = [];
-          if (unit.images) {
-            try {
-              parsedImages = typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images;
-            } catch {}
-          }
+          const parsedImages = normalizeUnitImageList(unit.images);
           const basePrice = getMinPrice(unit.name) ?? (Number(unit.base_price) || 0);
           const { closed: closedForCurrentPeriod, reopenDate } = getClosed(unit.name);
           return {
@@ -2597,20 +2588,7 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
 
       // Transform the data to match the expected interface
       const transformedUnits = units?.map((unit: any) => {
-        // Parse images JSON string to array
-        let parsedImages = [];
-        if (unit.images) {
-          try {
-            if (typeof unit.images === 'string') {
-              parsedImages = JSON.parse(unit.images);
-            } else if (Array.isArray(unit.images)) {
-              parsedImages = unit.images;
-            }
-          } catch (error) {
-            console.log("⚠️ [UNITS] Failed to parse images for unit:", unit.id, error);
-            parsedImages = [];
-          }
-        }
+        const parsedImages = normalizeUnitImageList(unit.images);
 
         return {
           ...unit,
@@ -2700,7 +2678,7 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
         bathrooms: unit.bathrooms,
         basePrice: unit.base_price,
         cleaningFee: unit.cleaning_fee,
-        images: unit.images ? (typeof unit.images === 'string' ? JSON.parse(unit.images) : unit.images) : [],
+        images: normalizeUnitImageList(unit.images),
         minStayDays: unit.min_stay_days,
         isActive: unit.is_active
       };
@@ -3193,15 +3171,19 @@ async function handleAdminRoutes(path: string, method: string, supabase: any, ev
           body: JSON.stringify({ success: false, error: 'Invalid JSON body', detail: parseErr?.message })
         };
       }
-      const updateData: any = {
-        name: body.name,
-        description: body.description ?? '',
-        location: body.location ?? '',
-        city: body.city,
-        country: body.country
-      };
-      if (body.main_image != null) {
-        updateData.main_image = body.main_image;
+      const updateData: Record<string, unknown> = {};
+      if (body.name != null) updateData.name = body.name;
+      if (body.description != null) updateData.description = body.description;
+      if (body.location != null) updateData.location = body.location;
+      if (body.city != null) updateData.city = body.city;
+      if (body.country != null) updateData.country = body.country;
+      if (body.main_image != null) updateData.main_image = body.main_image;
+      if (Object.keys(updateData).length === 0) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'No fields to update', requestId })
+        };
       }
       const { data: property, error } = await supabase
         .from('properties')
