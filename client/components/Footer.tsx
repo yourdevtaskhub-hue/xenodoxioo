@@ -1,6 +1,7 @@
 import { Mail, Phone, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
+import { CONTACT_ADDRESS_MAP_URL } from "@/lib/api";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -76,7 +77,7 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Contact</h4>
+            <h4 className="font-semibold text-foreground mb-4">{t("footer.contact")}</h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Mail size={16} />
@@ -90,7 +91,7 @@ export default function Footer() {
               <li className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Phone size={16} />
                 <a
-                  href={`tel:${t("footer.phone")}`}
+                  href={`tel:${t("footer.phone").replace(/\s/g, "")}`}
                   className="hover:text-primary transition-colors"
                 >
                   {t("footer.phone")}
@@ -98,7 +99,14 @@ export default function Footer() {
               </li>
               <li className="flex items-start gap-2 text-muted-foreground text-sm">
                 <MapPin size={16} className="mt-0.5 flex-shrink-0" />
-                <span>{t("footer.address")}</span>
+                <a
+                  href={CONTACT_ADDRESS_MAP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-left hover:text-primary transition-colors"
+                >
+                  {t("footer.address")}
+                </a>
               </li>
             </ul>
           </div>

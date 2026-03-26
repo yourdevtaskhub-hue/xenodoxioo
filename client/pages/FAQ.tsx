@@ -1,5 +1,6 @@
 import { HelpCircle, Mail, Phone, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
+import { CONTACT_ADDRESS_MAP_URL } from "@/lib/api";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export default function FAQ() {
@@ -95,7 +96,7 @@ export default function FAQ() {
               <div className="flex items-center gap-3 text-muted-foreground">
                 <Phone size={20} />
                 <a 
-                  href={`tel:${t("footer.phone")}`}
+                  href={`tel:${t("footer.phone").replace(/\s/g, "")}`}
                   className="hover:text-primary transition-colors"
                 >
                   {t("footer.phone")}
@@ -104,7 +105,14 @@ export default function FAQ() {
               
               <div className="flex items-start gap-3 text-muted-foreground">
                 <MapPin size={20} className="mt-1 flex-shrink-0" />
-                <span>{t("footer.address")}</span>
+                <a
+                  href={CONTACT_ADDRESS_MAP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary transition-colors text-left"
+                >
+                  {t("footer.address")}
+                </a>
               </div>
             </div>
           </div>

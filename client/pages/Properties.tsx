@@ -1,6 +1,12 @@
 import Layout from "@/components/Layout";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
-import { sortByRoomOrder, getUnitBedTagKey } from "@/lib/room-display-order";
+import {
+  sortByRoomOrder,
+  getUnitBedTagKey,
+  getUnitDescriptionKey,
+  getUnitDisplayTitleKey,
+  getMaxGuestsForUnit,
+} from "@/lib/room-display-order";
 import { Link, useSearchParams } from "react-router-dom";
 import { Users, Bed, Bath } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -222,9 +228,9 @@ export default function Properties() {
             {loadingUnits ? (
               <div className="space-y-6 animate-pulse">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="grid md:grid-cols-3 gap-6 p-4 md:p-6 rounded-lg border border-border">
-                    <div className="md:col-span-1 h-64 md:h-48 rounded-lg bg-muted" />
-                    <div className="md:col-span-2 space-y-3">
+                  <div key={i} className="grid md:grid-cols-12 gap-6 p-4 md:p-6 rounded-lg border border-border">
+                    <div className="md:col-span-5 min-h-[18rem] md:min-h-[22rem] rounded-lg bg-muted" />
+                    <div className="md:col-span-7 space-y-3">
                       <div className="h-5 w-1/3 bg-muted rounded" />
                       <div className="h-6 w-2/3 bg-muted rounded" />
                       <div className="h-4 w-full bg-muted rounded" />
@@ -262,12 +268,12 @@ export default function Properties() {
                   <Link
                     key={unit.id}
                     to={`/properties/${unit.property?.id ?? unit.propertyId}`}
-                    className="grid md:grid-cols-3 gap-6 card-hover p-4 md:p-6"
+                    className="grid md:grid-cols-12 gap-6 card-hover p-4 md:p-6"
                     onMouseEnter={() => fetch(apiUrl(`/api/properties/id/${unit.property?.id ?? unit.propertyId}`))}
                   >
-                    {/* Image */}
-                    <div className="md:col-span-1">
-                      <div className="relative h-64 md:h-full rounded-lg overflow-hidden bg-muted group">
+                    {/* Image — wider column + taller min height for clearer room preview */}
+                    <div className="md:col-span-5">
+                      <div className="relative min-h-[18rem] md:min-h-[22rem] lg:min-h-[26rem] h-full rounded-lg overflow-hidden bg-muted group">
                         <img
                           src={
                             (unit.images?.length && unit.images[0])
@@ -276,7 +282,10 @@ export default function Properties() {
                                 ? imageUrl(unit.property.main_image)
                                 : placeholderImage()
                           }
-                          alt={unit.name}
+                          alt={(() => {
+                            const tk = getUnitDisplayTitleKey(unit.name);
+                            return tk ? t(tk) : unit.name;
+                          })()}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                           loading={idx < 3 ? "eager" : "lazy"}
                           decoding="async"
@@ -292,18 +301,21 @@ export default function Properties() {
                     </div>
 
                     {/* Content */}
-                    <div className="md:col-span-2 flex flex-col justify-between">
+                    <div className="md:col-span-7 flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <h3 className="text-xl font-bold text-foreground">
-                              {unit.name}
+                              {(() => {
+                                const tk = getUnitDisplayTitleKey(unit.name);
+                                return tk ? t(tk) : unit.name;
+                              })()}
                             </h3>
                             {/small\s*bungalow/i.test(unit.name) && (
                               <p className="text-sm text-muted-foreground mt-0.5">Studio</p>
                             )}
                             {/lykoskufi\s*2|lykoskufi2/i.test(unit.name) && (
-                              <p className="text-sm text-muted-foreground mt-0.5">Mezzanine</p>
+                              <p className="text-sm text-muted-foreground mt-0.5">{t("property.tag.lykoskufi2Subtype")}</p>
                             )}
                             <div className="flex flex-wrap gap-4 mt-2 text-sm">
                               <div className="flex items-center gap-2 text-foreground">
@@ -322,7 +334,8 @@ export default function Properties() {
                               </div>
                               <div className="flex items-center gap-2 text-foreground">
                                 <Users size={16} className="text-primary" />
-                                {unit.maxGuests} {t("common.guests")}
+                                {getMaxGuestsForUnit(unit.name) ?? unit.maxGuests}{" "}
+                                {t("common.guests")}
                               </div>
                             </div>
                           </div>
@@ -353,11 +366,22 @@ export default function Properties() {
                           </div>
                         </div>
 
-                        {unit.description && (
-                          <p className="text-muted-foreground mb-4">
-                            {unit.description}
-                          </p>
-                        )}
+                        {(() => {
+                          const descKey = getUnitDescriptionKey(
+                            unit.property?.name ?? "",
+                            unit.name,
+                          );
+                          let text = (descKey ? t(descKey) : unit.description) ?? "";
+                          if (text) {
+                            text = text.replace(
+                              /Ειναι κτισμενο δε δεσποζουσα θεση/gi,
+                              "Είναι κτισμένο σε δεσποζούσα θέση",
+                            );
+                          }
+                          return text ? (
+                            <p className="text-muted-foreground mb-4">{text}</p>
+                          ) : null;
+                        })()}
                       </div>
 
                       {/* CTA */}

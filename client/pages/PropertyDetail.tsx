@@ -45,7 +45,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
-import { getUnitBedTagKey, getMaxGuestsForUnit } from "@/lib/room-display-order";
+import { getUnitBedTagKey, getMaxGuestsForUnit, getUnitDisplayTitleKey } from "@/lib/room-display-order";
 import formatCurrency from "@/lib/currency";
 import { getTieredPricePerNight } from "@/lib/price-tiers";
 import { Send, MessageSquare } from "lucide-react";
@@ -792,13 +792,16 @@ export default function PropertyDetail() {
                 {/* Header & Experience Description */}
                 <div className="mb-10">
                   <h1 className={`text-3xl md:text-4xl font-bold text-foreground ${/small\s*bungalow|lykoskufi\s*2|lykoskufi2/i.test(currentUnit.name) ? "mb-0" : "mb-6"}`}>
-                    {currentUnit.name}
+                    {(() => {
+                      const tk = getUnitDisplayTitleKey(currentUnit.name);
+                      return tk ? t(tk) : currentUnit.name;
+                    })()}
                   </h1>
                   {/small\s*bungalow/i.test(currentUnit.name) && (
                     <p className="text-muted-foreground text-sm mt-1 mb-6">Studio</p>
                   )}
                   {/lykoskufi\s*2|lykoskufi2/i.test(currentUnit.name) && (
-                    <p className="text-muted-foreground text-sm mt-1 mb-6">Mezzanine</p>
+                    <p className="text-muted-foreground text-sm mt-1 mb-6">{t("property.tag.lykoskufi2Subtype")}</p>
                   )}
 
                   {/* Description — from system translations (not admin panel) */}

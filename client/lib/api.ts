@@ -51,3 +51,7 @@ export function imageUrl(path: string | null | undefined | Record<string, unknow
 export function placeholderImage(): string {
   return PLACEHOLDER_IMAGE;
 }
+
+/** Google Maps query for property/postal area (37°13'36.9"N 22°53'08.7"E) */
+export const CONTACT_ADDRESS_MAP_URL =
+  "https://www.google.com/maps/search/?api=1&query=37.2269167%2C22.88575";

@@ -47,12 +47,36 @@ export function getUnitBedTagKey(propertyName: string, unitName: string): string
   return null;
 }
 
+/** Translation key for unit card blurbs (property.unitDesc.ograHouse, etc.). */
+export function getUnitDescriptionKey(propertyName: string, unitName: string): string | null {
+  const n = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+  const p = n(propertyName ?? "");
+  const u = n(unitName ?? "");
+  const check = (key: string) => p.includes(key) || u.includes(key);
+
+  if (check("ogra") || check("ogia")) return "property.unitDesc.ograHouse";
+  if (check("small") && check("bungalow")) return "property.unitDesc.smallBungalow";
+  if ((check("big") || check("large") || check("μεγάλο") || check("megalo")) && check("bungalow")) return "property.unitDesc.bigBungalow";
+  if (check("lykoskufi 5") || check("lykoski 5") || ((check("lykoskufi") || check("lykoski")) && u.includes("5"))) return "property.unitDesc.lykoskufi5";
+  if (check("lykoskufi 2") || check("lykoski 2") || ((check("lykoskufi") || check("lykoski")) && (u.includes("2") || u.includes("ii")))) return "property.unitDesc.lykoskufi2";
+  if (check("lykoskufi 1") || check("lykoski 1") || ((check("lykoskufi") || check("lykoski")) && (u.includes("1") || u.includes("i")))) return "property.unitDesc.lykoskufi1";
+  if (check("lykoskufi") || check("lykoski")) return "property.unitDesc.lykoskufi1";
+  return null;
+}
+
+/** Shown title override (e.g. branding). Returns translation key or null. */
+export function getUnitDisplayTitleKey(unitName: string): string | null {
+  const u = (unitName || "").toLowerCase().trim();
+  if (/ogra/i.test(u)) return "property.unitTitle.ograHouse";
+  return null;
+}
+
 /** Max guests per unit override. Returns number or null to use API/DB value. */
 export function getMaxGuestsForUnit(unitName: string): number | null {
   const u = (unitName || "").toLowerCase().trim().replace(/\s+/g, " ");
   if (/small\s*bungalow/i.test(u)) return 3;
   if ((/big\s*bungalow|μεγάλο|megalo/i.test(u)) && /bungalow/i.test(u)) return 3;
-  if (/lykoskufi\s*1|lykoskufi1|lykoski\s*1/i.test(u)) return 3;
+  if (/lykoskufi\s*1|lykoskufi1|lykoski\s*1/i.test(u)) return 2;
   if (/lykoskufi\s*2|lykoskufi2|lykoski\s*2/i.test(u)) return 5;
   return null;
 }

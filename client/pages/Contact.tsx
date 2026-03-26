@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
-import { MapPin, Phone, Mail, Clock, Send, MessageCircle } from "lucide-react";
+import { MapPin, Phone, Mail, Send, MessageCircle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useState } from "react";
 import Layout from "@/components/Layout";
+import { CONTACT_ADDRESS_MAP_URL } from "@/lib/api";
 
 export default function Contact() {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
 
@@ -144,13 +145,18 @@ export default function Contact() {
                 >
                   <h3 className="luxury-heading text-xl text-foreground">{t("contact.info.title")}</h3>
                   <div className="space-y-4">
-                    <div className="flex gap-4">
+                    <a
+                      href={CONTACT_ADDRESS_MAP_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex gap-4 group"
+                    >
                       <MapPin className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
-                      <div>
-                        <p className="text-sm text-muted-foreground">{t("contact.info.address")}</p>
-                      </div>
-                    </div>
-                    <a href="tel:+302754051234" className="flex gap-4 group">
+                      <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
+                        {t("contact.info.address")}
+                      </p>
+                    </a>
+                    <a href={`tel:${t("contact.info.phone").replace(/\s/g, "")}`} className="flex gap-4 group">
                       <Phone className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
                       <span className="text-foreground group-hover:text-primary transition-colors">
                         {t("contact.info.phone")}
@@ -162,13 +168,6 @@ export default function Contact() {
                         {t("contact.info.email")}
                       </span>
                     </a>
-                    <div className="flex gap-4">
-                      <Clock className="w-5 h-5 text-primary/80 shrink-0 mt-0.5" strokeWidth={1.25} />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{t("contact.info.hours")}</p>
-                        <p className="text-sm text-muted-foreground">{t("contact.info.hoursVal")}</p>
-                      </div>
-                    </div>
                   </div>
                 </motion.div>
 
@@ -228,23 +227,23 @@ export default function Contact() {
               className="text-center max-w-3xl mx-auto"
             >
               <h2 className="luxury-heading text-3xl md:text-4xl text-white">
-                Έτοιμοι για την εμπειρία σας;
+                {t("contact.banner.title")}
               </h2>
               <p className="mt-4 text-lg text-white/90 leading-relaxed">
-                Επικοινωνήστε μαζί μας σήμερα για να σχεδιάσουμε την ιδανική διαμονή σας στη Λεωνίδιο. Η ομάδα μας είναι εδώ για να κάνει το όνειρό σας πραγματικότητα.
+                {t("contact.banner.body")}
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
                 <a
                   href="/properties"
                   className="luxury-btn-primary"
                 >
-                  Δείτε τις Ιδιοκτησίες
+                  {t("contact.banner.viewProperties")}
                 </a>
                 <a
-                  href="tel:+302754051234"
+                  href={`tel:${t("contact.info.phone").replace(/\s/g, "")}`}
                   className="inline-flex items-center justify-center border border-white/20 px-8 py-3.5 font-medium text-white rounded-md hover:bg-white/10 transition-colors"
                 >
-                  Καλέστε Τώρα
+                  {t("contact.banner.callNow")}
                 </a>
               </div>
             </motion.div>

@@ -66,18 +66,18 @@ export default function About() {
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/40" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="container-max w-full">
+          <div className="absolute inset-0 flex items-start justify-center pt-14 md:pt-20 lg:pt-28">
+            <div className="container-max w-full px-4">
               <motion.div
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.2 }}
                 className="max-w-2xl mx-auto text-center"
               >
-                <h1 className="luxury-heading text-4xl md:text-5xl lg:text-6xl text-white tracking-tight">
-                  LEONIDIONHOUSES
+                <h1 className="font-cavolini lowercase text-3xl md:text-4xl lg:text-5xl text-white tracking-tight font-bold">
+                  {t("home.hero.brandTitle")}
                 </h1>
-                <p className="mt-4 text-lg md:text-xl text-white/90 font-light leading-relaxed">
+                <p className="mt-4 text-lg md:text-xl text-white/90 font-light leading-relaxed font-cavolini">
                   {t("about.hero.subtitle")}
                 </p>
               </motion.div>
@@ -95,14 +95,16 @@ export default function About() {
               className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12"
             >
               {[
-                { label: t("about.trust.years"), value: t("about.trust.yearsVal") },
+                { label: "", value: t("about.trust.yearsVal") },
                 { label: t("about.trust.properties"), value: t("about.trust.propertiesVal") },
-                { label: "Ευχαριστημένοι Επισκέπτες", value: "5000+" },
-                { label: "Θετικές Κριτικές", value: "100+" },
+                { label: t("about.trust.guests"), value: "200+" },
+                { label: t("about.trust.reviews"), value: "100+" },
               ].map((item, i) => (
                 <motion.div key={i} variants={fadeIn} className="text-center">
                   <p className="text-2xl md:text-3xl luxury-heading text-foreground">{item.value}</p>
-                  <p className="mt-1 text-sm text-muted-foreground uppercase tracking-wider">{item.label}</p>
+                  {item.label ? (
+                    <p className="mt-1 text-sm text-muted-foreground uppercase tracking-wider">{item.label}</p>
+                  ) : null}
                 </motion.div>
               ))}
             </motion.div>

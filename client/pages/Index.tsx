@@ -1,20 +1,15 @@
 import Layout from "@/components/Layout";
 import { apiUrl, imageUrl } from "@/lib/api";
-import { sortByRoomOrder } from "@/lib/room-display-order";
+import { sortByRoomOrder, getUnitDisplayTitleKey } from "@/lib/room-display-order";
 import { Link } from "react-router-dom";
 import {
   Calendar,
   Users,
   MapPin,
   Search,
-  Wifi,
   Utensils,
   Waves,
-  Star,
   Compass,
-  Camera,
-  Heart,
-  Clock,
   ArrowRight,
   MessageSquare,
   CheckCircle2,
@@ -107,7 +102,7 @@ function PrivateBeachesSection() {
   const { t } = useLanguage();
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
 
-  const bigBeachImages = ["/bigbeach1.jpg", "/bigbeach2.jpg", "/bigbeach3.jpg", "/bigbeach4.jpg"];
+  const bigBeachImages = ["/bigbeach1.jpg", "/bigbeach3.jpg", "/bigbeach4.jpg"];
   const smallBeachImages = ["/smallbeach1.jpg", "/smallbeach2.jpg", "/smallbeach3.jpg", "/smallbeach4.jpg"];
 
   const openLightbox = (images: string[], index: number) => {
@@ -219,11 +214,6 @@ export default function Index() {
   const { language, t } = useLanguage();
 
   const amenities = [
-    {
-      icon: Wifi,
-      label: t("amenities.fastWifi"),
-      description: t("amenities.fastWifiDesc"),
-    },
     {
       icon: Utensils,
       label: t("amenities.fullKitchen"),
@@ -445,7 +435,10 @@ export default function Index() {
                   <div className="relative h-64 overflow-hidden bg-muted">
                     <img
                       src={imageUrl(property.mainImage ?? (property as { main_image?: string }).main_image)}
-                      alt={property.name}
+                      alt={(() => {
+                        const tk = getUnitDisplayTitleKey(property.name);
+                        return tk ? t(tk) : property.name;
+                      })()}
                       loading={idx < 3 ? "eager" : "lazy"}
                       decoding="async"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
@@ -465,7 +458,10 @@ export default function Index() {
                   {/* Content */}
                   <div className="p-6">
                     <h3 className="text-xl font-bold text-foreground mb-2">
-                      {property.name}
+                      {(() => {
+                        const tk = getUnitDisplayTitleKey(property.name);
+                        return tk ? t(tk) : property.name;
+                      })()}
                     </h3>
                     <p className="text-muted-foreground text-sm">
                       {property.location || `${property.city}, ${property.country}`}
@@ -491,7 +487,7 @@ export default function Index() {
             {t("home.why.title")}
           </h2>
 
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
             {amenities.map((amenity, index) => {
               const Icon = amenity.icon;
               return (
@@ -510,129 +506,30 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Experiences Section */}
-      <section className="py-20 bg-gradient-to-b from-background to-primary/5">
-        <div className="container-max">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              {t("home.experiences.title")}
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              {t("home.experiences.subtitle")}
-            </p>
-          </div>
-
+      {/* Trust Section */}
+      <section className="bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 section-padding">
+        <div className="container-max text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
+          {t("home.trust.title")}
+        </h2>
+          <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
+            {t("home.trust.description")}
+          </p>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="group relative overflow-hidden rounded-2xl bg-white shadow-lg hover:shadow-2xl transition-all duration-300">
-              <div className="aspect-video overflow-hidden">
-                <img 
-                  src="/beach.png" 
-                  alt="Περιπέτειες παραλίας και θάλασσας"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={(e) => {
-                    e.currentTarget.src = "/village.png";
-                  }}
-                />
-              </div>
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Star className="w-5 h-5 text-accent fill-current" />
-                  <span className="text-sm font-semibold text-accent">{t("home.experiences.popular")}</span>
-                </div>
-                <h3 className="text-xl font-bold text-foreground mb-2">
-                  {t("home.experiences.beach.title")}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {t("home.experiences.beach.description")}
-                </p>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-1">
-                    <Clock size={16} />
-                    <span>{t("home.experiences.beach.duration")}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users size={16} />
-                    <span>{t("home.experiences.beach.group")}</span>
-                  </div>
-                  <Compass size={24} className="text-primary" />
-                </div>
-              </div>
+            <div>
+              <div className="text-4xl font-bold text-primary mb-2">200+</div>
+              <p className="text-muted-foreground">{t("common.happyGuests")}</p>
             </div>
-
-            <div className="group relative overflow-hidden rounded-2xl bg-white shadow-lg hover:shadow-2xl transition-all duration-300">
-              <div className="aspect-video overflow-hidden">
-                <img 
-                  src="/village.png" 
-                  alt="Περιηγήσεις πολιτιστικής κληρονομιάς"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={(e) => {
-                    e.currentTarget.src = "/food.png";
-                  }}
-                />
-              </div>
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Heart className="w-5 h-5 text-accent fill-current" />
-                  <span className="text-sm font-semibold text-accent">{t("home.experiences.recommended")}</span>
-                </div>
-                <h3 className="text-xl font-bold text-foreground mb-2">
-                  {t("home.experiences.culture.title")}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {t("home.experiences.culture.description")}
-                </p>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-1">
-                    <Clock size={16} />
-                    <span>{t("home.experiences.culture.duration")}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users size={16} />
-                    <span>{t("home.experiences.culture.group")}</span>
-                  </div>
-                  <Camera size={24} className="text-primary" />
-                </div>
-              </div>
+            <div>
+              <div className="text-4xl font-bold text-primary mb-2">6</div>
+              <p className="text-muted-foreground">{t("common.luxuryUnits")}</p>
             </div>
-
-            <div className="group relative overflow-hidden rounded-2xl bg-white shadow-lg hover:shadow-2xl transition-all duration-300">
-              <div className="aspect-video overflow-hidden">
-                <img 
-                  src="/food.png" 
-                  alt="Γαστρονομικά ταξίδια"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  onError={(e) => {
-                    e.currentTarget.src = "/beach.png";
-                  }}
-                />
-              </div>
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Star className="w-5 h-5 text-accent fill-current" />
-                  <span className="text-sm font-semibold text-accent">{t("home.experiences.exclusive")}</span>
-                </div>
-                <h3 className="text-xl font-bold text-foreground mb-2">
-                  {t("home.experiences.dining.title")}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {t("home.experiences.dining.description")}
-                </p>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-1">
-                    <Clock size={16} />
-                    <span>{t("home.experiences.dining.duration")}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users size={16} />
-                    <span>{t("home.experiences.dining.group")}</span>
-                  </div>
-                  <Utensils size={24} className="text-primary" />
-                </div>
-              </div>
+            <div>
+              <div className="text-4xl font-bold text-primary mb-2">4.9★</div>
+              <p className="text-muted-foreground">{t("common.averageRating")}</p>
             </div>
           </div>
-
-                  </div>
+        </div>
       </section>
 
       {/* Better Price Inquiry CTA Section */}
@@ -665,36 +562,10 @@ export default function Index() {
               </div>
               <div className="hidden md:flex items-center justify-center p-12 bg-gradient-to-br from-primary/5 to-accent/10">
                 <div className="text-center space-y-6">
-                  <div className="text-6xl font-bold text-primary">-15%</div>
+                  <div className="text-6xl font-bold text-primary">-%</div>
                   <p className="text-lg text-muted-foreground max-w-xs">{t("home.inquiry.discountNote")}</p>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Section */}
-      <section className="bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 section-padding">
-        <div className="container-max text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
-          {t("home.trust.title")}
-        </h2>
-          <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-            {t("home.trust.description")}
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">5,000+</div>
-              <p className="text-muted-foreground">{t("common.happyGuests")}</p>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">6</div>
-              <p className="text-muted-foreground">{t("common.luxuryUnits")}</p>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">4.8★</div>
-              <p className="text-muted-foreground">{t("common.averageRating")}</p>
             </div>
           </div>
         </div>
