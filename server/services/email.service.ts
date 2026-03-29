@@ -1,8 +1,16 @@
 import { Resend } from "resend";
 import { supabase } from "../lib/db";
 
-const FROM_EMAIL =
-  process.env.FROM_EMAIL || "noreply@leonidionhouses.com";
+/** Map legacy FROM_EMAIL @leonidion-houses.com → verified @leonidionhouses.com (Resend). */
+function resolveFromEmail(): string {
+  const raw = (process.env.FROM_EMAIL || "noreply@leonidionhouses.com").trim();
+  if (/@leonidion-houses\.com$/i.test(raw)) {
+    return raw.replace(/@leonidion-houses\.com$/i, "@leonidionhouses.com");
+  }
+  return raw;
+}
+
+const FROM_EMAIL = resolveFromEmail();
 const FROM_NAME = process.env.FROM_NAME || "LEONIDIONHOUSES";
 
 function getFrontendUrl(): string {
@@ -128,6 +136,55 @@ export async function sendWelcomeEmail(
 }
 
 const GUEST_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+/**
+ * Προειδοποίηση: αυτόματη χρέωση υπολοίπου (75%) ~21 ημέρες πριν το check-in.
+ * (Ο scheduler μπορεί να το καλεί προαιρετικά πριν την 1η προσπάθεια χρέωσης.)
+ */
+export async function sendBalanceDueReminderEmail(
+  guestEmail: string,
+  payload: {
+    bookingId: string;
+    bookingNumber: string;
+    guestName: string;
+    remainingEur: number;
+    scheduledChargeDateIso: string;
+    checkInDateIso: string;
+    propertyName?: string;
+    unitName?: string;
+  },
+  userId?: string | null,
+) {
+  const viewUrl = `${getFrontendUrl()}/booking/${payload.bookingId}?email=${encodeURIComponent(guestEmail)}`;
+  const due = formatDateSafe(payload.scheduledChargeDateIso);
+  const checkIn = formatDateSafe(payload.checkInDateIso);
+
+  const html = `
+    <h1>Reminder: balance payment</h1>
+    <p>Dear ${payload.guestName},</p>
+    <p>This is a reminder that the <strong>remaining balance (75%)</strong> for your stay will be charged automatically to the card you used for the deposit on or shortly after <strong>${due}</strong> (according to our policy, about 21 days before check-in).</p>
+    <h2>Details</h2>
+    <ul>
+      <li><strong>Booking number:</strong> ${payload.bookingNumber}</li>
+      <li><strong>Property:</strong> ${payload.propertyName || "N/A"}</li>
+      <li><strong>Unit:</strong> ${payload.unitName || "N/A"}</li>
+      <li><strong>Check-in:</strong> ${checkIn}</li>
+      <li><strong>Amount to charge:</strong> €${payload.remainingEur.toFixed(2)}</li>
+    </ul>
+    <p>If your card has expired or you need to use another card, please contact us before the charge date.</p>
+    <p><a href="${viewUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View booking</a></p>
+    <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
+  `;
+
+  return sendEmail({
+    to: guestEmail,
+    subject: `Reminder — balance €${payload.remainingEur.toFixed(2)} (due ${due}) — ${payload.bookingNumber}`,
+    html,
+    type: "PAYMENT_REMINDER",
+    userId: userId ?? undefined,
+    bookingId: payload.bookingId,
+  });
+}
 
 function getViewBookingUrl(booking: any, userId?: string | null, guestEmail?: string): string {
   const base = getFrontendUrl();

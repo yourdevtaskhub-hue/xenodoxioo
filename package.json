@@ -23,6 +23,8 @@
     "test": "vitest --run",
     "test:scheduler-dry-run": "tsx scripts/run-scheduler-dry-run.ts",
     "test:scheduled-charge-e2e": "tsx scripts/test-scheduled-charge-e2e.ts",
+    "test:stripe-booking": "tsx scripts/controlled-stripe-booking-test.ts",
+    "test:balance-emails": "tsx scripts/test-balance-emails-resend.ts",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "db:seed": "tsx prisma/seed-working.ts",

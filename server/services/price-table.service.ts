@@ -6,6 +6,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
+
+const serverDir = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -48,11 +51,10 @@ export interface ParsedPriceTable {
 const PRICE_TABLE_FILENAME = "Πίνακας Τιμών Δωματίων.txt";
 
 function getPriceTablePath(): string {
-  // Project root is typically process.cwd() or __dirname/../..
   const candidates = [
     path.join(process.cwd(), PRICE_TABLE_FILENAME),
-    path.join(__dirname, "..", "..", PRICE_TABLE_FILENAME),
-    path.join(__dirname, "..", "..", "..", PRICE_TABLE_FILENAME),
+    path.join(serverDir, "..", "..", PRICE_TABLE_FILENAME),
+    path.join(serverDir, "..", "..", "..", PRICE_TABLE_FILENAME),
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
