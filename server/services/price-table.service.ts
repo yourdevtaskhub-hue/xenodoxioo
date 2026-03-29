@@ -8,8 +8,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-const serverDir = path.dirname(fileURLToPath(import.meta.url));
-
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface PeriodPrice {
@@ -50,16 +48,48 @@ export interface ParsedPriceTable {
 
 const PRICE_TABLE_FILENAME = "Πίνακας Τιμών Δωματίων.txt";
 
+/** Safe in Netlify/esbuild bundle: never evaluate import.meta at module load (can break path.join). */
+function dirFromImportMetaUrl(): string | null {
+  try {
+    const u = import.meta.url;
+    if (typeof u !== "string" || u.length < 8) return null;
+    const dir = path.dirname(fileURLToPath(u));
+    return dir.length > 0 ? dir : null;
+  } catch {
+    return null;
+  }
+}
+
 function getPriceTablePath(): string {
-  const candidates = [
-    path.join(process.cwd(), PRICE_TABLE_FILENAME),
-    path.join(serverDir, "..", "..", PRICE_TABLE_FILENAME),
-    path.join(serverDir, "..", "..", "..", PRICE_TABLE_FILENAME),
-  ];
+  const explicit = typeof process.env.PRICE_TABLE_PATH === "string" ? process.env.PRICE_TABLE_PATH.trim() : "";
+  if (explicit && fs.existsSync(explicit)) return explicit;
+
+  const candidates: string[] = [];
+  const add = (parts: string[]) => {
+    if (parts.some((x) => typeof x !== "string" || x === "")) return;
+    try {
+      candidates.push(path.join(...(parts as string[])));
+    } catch {
+      /* ignore malformed join */
+    }
+  };
+
+  add([process.cwd(), PRICE_TABLE_FILENAME]);
+  // Netlify Lambda cwd is usually /var/task; included_files land next to the bundle
+  add(["/var/task", PRICE_TABLE_FILENAME]);
+  add(["/var/task/netlify/functions", PRICE_TABLE_FILENAME]);
+
+  const fromMeta = dirFromImportMetaUrl();
+  if (fromMeta) {
+    add([fromMeta, "..", "..", PRICE_TABLE_FILENAME]);
+    add([fromMeta, "..", "..", "..", PRICE_TABLE_FILENAME]);
+  }
+
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
   }
-  throw new Error(`Price table file not found: ${PRICE_TABLE_FILENAME}. Tried: ${candidates.join(", ")}`);
+
+  throw new Error(`Price table file not found: ${PRICE_TABLE_FILENAME}. Tried: ${candidates.join(" | ")}`);
 }
 
 // ── Parse period string (e.g. "20/12 – 07/01" or "01/06 – 30/06") ────
