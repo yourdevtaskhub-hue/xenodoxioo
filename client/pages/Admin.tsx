@@ -330,12 +330,12 @@ function InquiriesManagement({ onReplySent, onInquiryViewed }: { onReplySent?: (
           </p>
           {units.length === 0 && (
             <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg text-muted-foreground text-sm">
-              {language === "el" ? "Δεν βρέθηκαν δωμάτια για αυτήν την ιδιοκτησία." : "No units found for this property."}
+              {t("admin.noUnitsForProperty")}
             </div>
           )}
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">{language === "el" ? "Δωμάτιο" : "Unit"}</label>
+              <label className="block text-sm font-medium text-foreground mb-1">{t("admin.room")}</label>
               <select value={offerUnitId} onChange={(e) => setOfferUnitId(e.target.value)}
                 disabled={units.length === 0}
                 className="w-full px-4 py-2 border border-border rounded-lg text-foreground bg-background disabled:opacity-50">

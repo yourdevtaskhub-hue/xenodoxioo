@@ -29,6 +29,18 @@ import {
   Sofa,
   Home,
   Globe,
+  Music,
+  Microwave,
+  Refrigerator,
+  WashingMachine,
+  Fan,
+  Zap,
+  Coffee,
+  UtensilsCrossed,
+  Sun,
+  Table,
+  Sparkles,
+  Heater,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -315,6 +327,21 @@ const LYKOSKUFI_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key
   { categoryKey: "amenities.modal.cat.languages", items: [{ key: "amenities.modal.langDe" }, { key: "amenities.modal.langEl" }, { key: "amenities.modal.langEn" }, { key: "amenities.modal.langFr" }] },
 ];
 
+function isLykoskufi5Unit(unitName: string | undefined): boolean {
+  if (!unitName) return false;
+  const u = unitName.toLowerCase().trim().replace(/\s+/g, " ");
+  return /lykoskufi\s*5|lykoskufi5/.test(u);
+}
+
+function buildLykoskufiAmenitiesModal(unitName: string | undefined) {
+  if (!isLykoskufi5Unit(unitName)) return LYKOSKUFI_AMENITIES_MODAL;
+  return LYKOSKUFI_AMENITIES_MODAL.map((cat) =>
+    cat.categoryKey === "amenities.modal.cat.media"
+      ? { ...cat, items: [...cat.items, { key: "amenities.modal.grandPiano" }] }
+      : cat,
+  );
+}
+
 // Amenities modal data: Ogra House
 const OGRA_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key: string; descKey?: string }> }> = [
   { categoryKey: "amenities.modal.cat.parking", items: [{ key: "amenities.modal.parkingDesc", descKey: "amenities.modal.parkingDesc" }] },
@@ -332,10 +359,10 @@ const OGRA_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key: str
     { key: "amenities.modal.privateBathroom" }, { key: "amenities.modal.toilet" }, { key: "amenities.modal.freeToiletries" },
     { key: "amenities.modal.hairDryer" }, { key: "amenities.modal.shower" },
   ]},
-  { categoryKey: "amenities.modal.cat.living", items: [{ key: "amenities.modal.diningArea" }, { key: "amenities.modal.sofa" }, { key: "amenities.modal.fireplace" }, { key: "amenities.modal.sittingArea" }, { key: "amenities.modal.workDesk" }] },
-  { categoryKey: "amenities.modal.cat.media", items: [{ key: "amenities.modal.flatScreenTV" }, { key: "amenities.modal.dvdPlayer" }, { key: "amenities.modal.radio" }, { key: "amenities.modal.tv" }] },
+  { categoryKey: "amenities.modal.cat.living", items: [{ key: "amenities.modal.diningArea" }, { key: "amenities.modal.sofa" }, { key: "amenities.modal.sittingArea" }, { key: "amenities.modal.workDesk" }] },
+  { categoryKey: "amenities.modal.cat.media", items: [{ key: "amenities.modal.flatScreenTV" }, { key: "amenities.modal.dvdPlayer" }, { key: "amenities.modal.radio" }, { key: "amenities.modal.tv" }, { key: "amenities.modal.grandPiano" }] },
   { categoryKey: "amenities.modal.cat.roomFeatures", items: [
-    { key: "amenities.modal.outletNearBed" }, { key: "amenities.modal.dryingRack" }, { key: "amenities.modal.mosquitoNet" },
+    { key: "amenities.modal.outletNearBed" }, { key: "amenities.modal.dryingRack" }, { key: "amenities.modal.windowScreens" },
     { key: "amenities.modal.privateEntrance" }, { key: "amenities.modal.heating" }, { key: "amenities.modal.iron" },
   ]},
   { categoryKey: "amenities.modal.cat.accessibility", items: [{ key: "amenities.modal.groundFloor" }] },
@@ -351,6 +378,23 @@ const OGRA_AMENITIES_MODAL: Array<{ categoryKey: string; items: Array<{ key: str
   { categoryKey: "amenities.modal.cat.misc", items: [{ key: "amenities.modal.ac" }, { key: "amenities.modal.smokingBan" }] },
   { categoryKey: "amenities.modal.cat.safety", items: [{ key: "amenities.modal.safe" }] },
   { categoryKey: "amenities.modal.cat.languages", items: [{ key: "amenities.modal.langDe" }, { key: "amenities.modal.langEl" }, { key: "amenities.modal.langEn" }, { key: "amenities.modal.langFr" }] },
+];
+
+/** Extra essentials for Small & Big Bungalow (kitchen, appliances, outdoor). Toiletries included here. */
+const BUNGALOW_EXTRA_ESSENTIALS = [
+  { icon: Utensils, labelKey: "amenities.bungalowKitchen", descKey: "amenities.bungalowKitchenDesc" },
+  { icon: Zap, labelKey: "amenities.bungalowElectricHob", descKey: "amenities.bungalowElectricHobDesc" },
+  { icon: Microwave, labelKey: "amenities.bungalowMicrowave", descKey: "amenities.bungalowMicrowaveDesc" },
+  { icon: Refrigerator, labelKey: "amenities.bungalowRefrigerator", descKey: "amenities.bungalowRefrigeratorDesc" },
+  { icon: WashingMachine, labelKey: "amenities.bungalowWashingMachine", descKey: "amenities.bungalowWashingMachineDesc" },
+  { icon: Coffee, labelKey: "amenities.bungalowKettle", descKey: "amenities.bungalowKettleDesc" },
+  { icon: Fan, labelKey: "amenities.bungalowFan", descKey: "amenities.bungalowFanDesc" },
+  { icon: UtensilsCrossed, labelKey: "amenities.bungalowCookware", descKey: "amenities.bungalowCookwareDesc" },
+  { icon: Bed, labelKey: "amenities.bungalowLinens", descKey: "amenities.bungalowLinensDesc" },
+  { icon: Flame, labelKey: "amenities.bungalowElectricBBQ", descKey: "amenities.bungalowElectricBBQDesc" },
+  { icon: Sun, labelKey: "amenities.bungalowSunLoungers", descKey: "amenities.bungalowSunLoungersDesc" },
+  { icon: Table, labelKey: "amenities.bungalowOutdoorTable", descKey: "amenities.bungalowOutdoorTableDesc" },
+  { icon: Sparkles, labelKey: "amenities.toiletries", descKey: "amenities.toiletriesDesc" },
 ];
 
 export default function PropertyDetail() {
@@ -979,35 +1023,48 @@ export default function PropertyDetail() {
                       { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
                       { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
                       { icon: Utensils, labelKey: "amenities.fullKitchen", descKey: "amenities.fullKitchenDesc" },
-                      { icon: Tv, labelKey: "amenities.smartTV", descKey: "amenities.smartTVDesc" },
+                      { icon: Tv, labelKey: "amenities.tv", descKey: "amenities.tvDesc" },
                       { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
                       { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
                       { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
                       { icon: ThermometerSun, labelKey: "amenities.heating", descKey: "amenities.heatingDesc" },
                       { icon: Shield, labelKey: "amenities.safe", descKey: "amenities.safeDesc" },
+                      { icon: Heater, labelKey: "amenities.hairDryer", descKey: "amenities.hairDryerDesc" },
+                      { icon: Sparkles, labelKey: "amenities.toiletries", descKey: "amenities.toiletriesDesc" },
+                      { icon: Music, labelKey: "amenities.grandPiano", descKey: "amenities.grandPianoDesc" },
                     ];
-                    const essentialsLykoskufi = [
+                    const essentialsLykoskufiBase = [
                       { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
                       { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
                       { icon: Utensils, labelKey: "amenities.fullKitchen", descKey: "amenities.fullKitchenDesc" },
-                      { icon: Tv, labelKey: "amenities.smartTV", descKey: "amenities.smartTVDesc" },
+                      { icon: Tv, labelKey: "amenities.tv", descKey: "amenities.tvDesc" },
                       { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
                       { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
                       { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
                       { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
+                      { icon: Heater, labelKey: "amenities.hairDryer", descKey: "amenities.hairDryerDesc" },
+                      { icon: Sparkles, labelKey: "amenities.toiletries", descKey: "amenities.toiletriesDesc" },
                     ];
+                    const essentialsLykoskufi = isLykoskufi5Unit(currentUnit?.name)
+                      ? [
+                          ...essentialsLykoskufiBase,
+                          { icon: Music, labelKey: "amenities.grandPiano", descKey: "amenities.grandPianoDesc" },
+                        ]
+                      : essentialsLykoskufiBase;
                     const essentialsBigBungalow = [
                       { icon: Wind, labelKey: "amenities.acBigBungalow", descKey: "amenities.acBigBungalowDesc" },
                       { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
                       { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
                       { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
                       { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
+                      ...BUNGALOW_EXTRA_ESSENTIALS,
                     ];
                     const essentialsSmallBungalow = [
                       { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
                       { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
                       { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
                       { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
+                      ...BUNGALOW_EXTRA_ESSENTIALS,
                     ];
                     const outdoorOgra = [
                       { icon: Waves, labelKey: "amenities.beachfront", descKey: "amenities.beachfrontDesc" },
@@ -1111,7 +1168,7 @@ export default function PropertyDetail() {
                                 <ScrollArea className="flex-1" style={{ maxHeight: "calc(90vh - 140px)" }}>
                                   <div className="p-6 sm:p-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                      {(isOgraHouse ? OGRA_AMENITIES_MODAL : LYKOSKUFI_AMENITIES_MODAL).map((cat, catIdx) => {
+                                      {(isOgraHouse ? OGRA_AMENITIES_MODAL : buildLykoskufiAmenitiesModal(currentUnit?.name)).map((cat, catIdx) => {
                                         const CatIcon = (
                                           { parking: Car, internet: Wifi, kitchen: Utensils, bedroom: Bed, bathroom: Bath,
                                             living: Sofa, media: Tv, roomFeatures: LayoutGrid, pets: PawPrint,
@@ -1168,11 +1225,16 @@ export default function PropertyDetail() {
                       const bungalow =
                         isSmallBungalowUnit(currentUnit.name, data.name) ||
                         isBigBungalowUnit(currentUnit.name, data.name);
+                      const grandPianoEligible =
+                        !bungalow &&
+                        !!currentUnit?.name &&
+                        (/ogra\s*house/i.test(currentUnit.name) || isLykoskufi5Unit(currentUnit.name));
                       const keys = [
                         "property.highlights.seaViews",
                         "property.highlights.modernKitchen",
                         "property.highlights.spaciousLiving",
                         "property.highlights.privateTerrace",
+                        ...(grandPianoEligible ? ["property.highlights.grandPiano"] as const : []),
                         "property.highlights.parking",
                       ];
                       const list = bungalow
