@@ -13,6 +13,10 @@
 [functions."ical-sync-scheduled"]
   schedule = "*/15 * * * *"
 
+# Balance due: charge deposit bookings (1st try ≈21 days before check-in, retry ≈19 days) — same cadence as Express node-cron
+[functions."charge-scheduled-payments"]
+  schedule = "0 8 * * *"
+
 # Payment routes → dedicated functions (must come before generic /api/*)
 [[redirects]]
   force = true

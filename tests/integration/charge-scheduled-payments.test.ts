@@ -1,35 +1,29 @@
 /**
- * Integration test: Τρέχει το πραγματικό chargeScheduledPayments().
+ * Integration test — OFF by default (no real Supabase/Stripe calls).
  *
- * - Χρησιμοποιεί πραγματικό Supabase + Stripe (test mode)
- * - Δεν δημιουργεί test bookings - απλά καλεί τη function
- * - Αν δεν υπάρχουν eligible bookings: επιστρέφει { processed: 0, failed: 0 }
- * - Αν υπάρχουν: θα προσπαθήσει να χρεώσει (Stripe test mode)
+ * Προϊόν / iCal: το default `pnpm test` ΔΕΝ καλεί chargeScheduledPayments πάνω σε παραγωγική DB,
+ * ώστε να μην υπάρχουν χρεώσεις ή ακυρώσεις που θα άλλαζαν availability προς Booking/Airbnb.
  *
- * Το κρίσιμο: το query περιλαμβάνει .neq("status", "CANCELLED") άρα τα
- * ακυρωμένα ΔΕΝ επιστρέφονται ποτέ από το Supabase.
+ * Για τοπική δοκιμή με test keys μόνο: RUN_INTEGRATION_SCHEDULER=1 pnpm exec vitest run tests/integration/charge-scheduled-payments.test.ts
  *
- * Για πλήρη επαλήθευση "τι θα χρεωθεί": τρέξε
- *   pnpm run test:scheduler-dry-run
+ * Για "τι θα χρεωθεί" χωρίς Stripe: pnpm exec tsx scripts/run-scheduler-dry-run.ts
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { chargeScheduledPayments } from "../../server/services/payment.service";
 
-describe("chargeScheduledPayments - πραγματική εκτέλεση", () => {
-  beforeAll(() => {
-    if (!process.env.STRIPE_SECRET_KEY || !process.env.SUPABASE_URL) {
-      console.warn("⚠️ STRIPE_SECRET_KEY ή SUPABASE_URL missing - test μπορεί να skip");
-    }
-  });
+const RUN = process.env.RUN_INTEGRATION_SCHEDULER === "1";
 
-  it("τρέχει χωρίς σφάλμα και επιστρέφει processed + failed", async () => {
+describe.skipIf(!RUN)("chargeScheduledPayments — integration (RUN_INTEGRATION_SCHEDULER=1)", () => {
+  it("επιστρέφει processed, failed, cancelled", async () => {
     const result = await chargeScheduledPayments();
 
     expect(result).toBeDefined();
     expect(typeof result.processed).toBe("number");
     expect(typeof result.failed).toBe("number");
+    expect(typeof result.cancelled).toBe("number");
     expect(result.processed).toBeGreaterThanOrEqual(0);
     expect(result.failed).toBeGreaterThanOrEqual(0);
+    expect(result.cancelled).toBeGreaterThanOrEqual(0);
   });
 });

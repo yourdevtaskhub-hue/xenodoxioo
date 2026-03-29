@@ -29,7 +29,8 @@ interface EmailOptions {
     | "REVIEW_REQUEST"
     | "ADMIN_ALERT"
     | "INQUIRY_NEW"
-    | "INQUIRY_REPLY";
+    | "INQUIRY_REPLY"
+    | "BOOKING_CANCELLED_UNPAID_BALANCE";
   userId?: string;
   bookingId?: string;
 }
@@ -112,7 +113,7 @@ export async function sendWelcomeEmail(
     <h1>Welcome to LEONIDIONHOUSES!</h1>
     <p>Dear ${firstName},</p>
     <p>Thank you for joining us. We're excited to have you on board.</p>
-    <p>You can now browse our beautiful villa collection and make your first booking.</p>
+    <p>You can now browse our beautiful accommodations and make your first booking.</p>
     <a href="${getFrontendUrl()}/properties" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Browse Rooms</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
@@ -295,6 +296,60 @@ export async function sendArrivalReminderEmail(
     html,
     type: "ARRIVAL_REMINDER",
     userId,
+    bookingId: booking.id,
+  });
+}
+
+/**
+ * Booking auto-cancelled after two failed scheduled balance charge attempts (≈21 and ≈19 days before check-in).
+ */
+export async function sendBookingCancelledUnpaidBalanceEmail(bookingId: string) {
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*, unit:units(*, property:properties(*))")
+    .eq("id", bookingId)
+    .single();
+
+  if (!booking) {
+    console.error("[EMAIL] sendBookingCancelledUnpaidBalanceEmail: booking not found", bookingId);
+    return;
+  }
+
+  const guestEmail = booking.guest_email;
+  if (!guestEmail) return;
+
+  const unit = booking.unit as any;
+  const property = unit?.property;
+  const guestName = booking.guest_name || "Guest";
+  const bookingNumber = booking.booking_number || bookingId;
+  const viewUrl = getViewBookingUrl(booking, booking.user_id, guestEmail);
+
+  const html = `
+    <h1>Booking cancelled — balance not received</h1>
+    <p>Dear ${guestName},</p>
+    <p>We attempted to charge the remaining balance for your stay twice (first when due before arrival, then on the retry date). Both attempts were unsuccessful.</p>
+    <p>As a result, your booking is now <strong>cancelled</strong> and the dates have been released for other guests.</p>
+    <h2>Booking details</h2>
+    <ul>
+      <li><strong>Booking number:</strong> ${bookingNumber}</li>
+      <li><strong>Property:</strong> ${property?.name || "N/A"}</li>
+      <li><strong>Unit:</strong> ${unit?.name || "N/A"}</li>
+      <li><strong>Check-in:</strong> ${formatDateSafe(booking.check_in_date)}</li>
+      <li><strong>Check-out:</strong> ${formatDateSafe(booking.check_out_date)}</li>
+    </ul>
+    <p>If you still wish to stay with us, please place a new booking and complete payment with a valid card.</p>
+    <p>If you believe this message was sent in error, reply to this email or contact us and we will help.</p>
+    <p><a href="${getFrontendUrl()}/properties" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Browse availability</a></p>
+    <p><a href="${viewUrl}" style="color: #0677A1;">Previous booking summary (reference only)</a></p>
+    <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
+  `;
+
+  return sendEmail({
+    to: guestEmail,
+    subject: `Booking cancelled — ${bookingNumber} — balance unpaid`,
+    html,
+    type: "BOOKING_CANCELLED_UNPAID_BALANCE",
+    userId: booking.user_id || undefined,
     bookingId: booking.id,
   });
 }

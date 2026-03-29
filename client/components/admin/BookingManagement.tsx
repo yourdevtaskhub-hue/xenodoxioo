@@ -4,6 +4,24 @@ import { Search, Filter, Eye, Calendar, Users, DollarSign, Clock, ArrowRight, Cr
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
 
+/**
+ * Check-in / check-out / scheduled charge: same calendar day as stored (server uses date-only → noon UTC).
+ * Using UTC in toLocaleDateString avoids admin browser timezone showing July 3 when DB is July 2.
+ */
+function formatStayDateUtc(d: string) {
+  if (!d) return "—";
+  const m = String(d).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = m
+    ? new Date(Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0))
+    : new Date(d);
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function formatTimestampLocal(d: string) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 interface Booking {
   id: string;
   bookingNumber: string;
@@ -117,11 +135,6 @@ export default function BookingManagement() {
     }
   };
 
-  const fmtDate = (d: string) => {
-    if (!d) return "—";
-    return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  };
-
   if (loading && bookings.length === 0) {
     return (
       <div className="animate-pulse">
@@ -209,16 +222,16 @@ export default function BookingManagement() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar size={14} className="text-primary flex-shrink-0" />
-                  <span className="font-medium text-foreground">{fmtDate(booking.checkInDate)}</span>
+                  <span className="font-medium text-foreground">{formatStayDateUtc(booking.checkInDate)}</span>
                   <ArrowRight size={12} className="text-muted-foreground flex-shrink-0" />
-                  <span className="font-medium text-foreground">{fmtDate(booking.checkOutDate)}</span>
+                  <span className="font-medium text-foreground">{formatStayDateUtc(booking.checkOutDate)}</span>
                   <span className="text-muted-foreground text-xs">({booking.nights}n)</span>
                 </div>
                 {/* Deposit: scheduled balance charge date */}
                 {booking.paymentType === "DEPOSIT" && booking.remainingAmount > 0 && booking.scheduledChargeDate && (
                   <div className="flex items-center gap-2 text-xs text-amber-600 mt-1">
                     <Clock size={12} className="flex-shrink-0" />
-                    <span>{t("admin.balanceDue").replace("{amount}", formatCurrency(booking.remainingAmount, language)).replace("{date}", fmtDate(booking.scheduledChargeDate))}</span>
+                    <span>{t("admin.balanceDue").replace("{amount}", formatCurrency(booking.remainingAmount, language)).replace("{date}", formatStayDateUtc(booking.scheduledChargeDate ?? ""))}</span>
                   </div>
                 )}
               </div>
@@ -311,11 +324,6 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
   const { language, t } = useLanguage();
   const [newStatus, setNewStatus] = useState(booking.status);
 
-  const fmtDate = (d: string) => {
-    if (!d) return "—";
-    return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -325,7 +333,7 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
               {booking.bookingNumber}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {t("admin.created")} {fmtDate(booking.createdAt)}
+              {t("admin.created")} {formatTimestampLocal(booking.createdAt)}
             </p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground text-xl leading-none">
@@ -361,12 +369,12 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
             <div className="flex items-center gap-3 text-sm">
               <div className="bg-primary/10 rounded-lg px-3 py-2 text-center">
                 <div className="text-xs text-muted-foreground">{t("admin.checkIn")}</div>
-                <div className="font-bold text-foreground">{fmtDate(booking.checkInDate)}</div>
+                <div className="font-bold text-foreground">{formatStayDateUtc(booking.checkInDate)}</div>
               </div>
               <ArrowRight size={16} className="text-muted-foreground" />
               <div className="bg-primary/10 rounded-lg px-3 py-2 text-center">
                 <div className="text-xs text-muted-foreground">{t("admin.checkOut")}</div>
-                <div className="font-bold text-foreground">{fmtDate(booking.checkOutDate)}</div>
+                <div className="font-bold text-foreground">{formatStayDateUtc(booking.checkOutDate)}</div>
               </div>
               <div className="ml-2 text-sm text-muted-foreground">{booking.nights === 1 ? t("admin.nightCountSingular") : t("admin.nightCount").replace("{count}", String(booking.nights))}</div>
             </div>
@@ -402,7 +410,7 @@ function BookingDetailsModal({ booking, onClose, onStatusUpdate }: { booking: Bo
                         <Clock size={14} />
                         {t("admin.autoChargeDate")}
                       </span>
-                      <span className="font-bold text-amber-700">{fmtDate(booking.scheduledChargeDate)}</span>
+                      <span className="font-bold text-amber-700">{formatStayDateUtc(booking.scheduledChargeDate ?? "")}</span>
                     </div>
                   )}
                 </>

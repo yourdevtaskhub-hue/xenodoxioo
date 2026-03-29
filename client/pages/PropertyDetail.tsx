@@ -3,6 +3,7 @@ import AvailabilityCalendar from "@/components/AvailabilityCalendar";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   Bed,
+  BedDouble,
   Bath,
   Users,
   MapPin,
@@ -45,7 +46,16 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
-import { getUnitBedTagKey, getMaxGuestsForUnit, getUnitDisplayTitleKey } from "@/lib/room-display-order";
+import {
+  getUnitBedTagKey,
+  getUnitBedDisplay,
+  getMaxGuestsForUnit,
+  getUnitDisplayTitleKey,
+  getClosedBungalowNightlyDisplayPrice,
+  getClosedBungalowSeasonMessageKey,
+  isSmallBungalowUnit,
+  isBigBungalowUnit,
+} from "@/lib/room-display-order";
 import formatCurrency from "@/lib/currency";
 import { getTieredPricePerNight } from "@/lib/price-tiers";
 import { Send, MessageSquare } from "lucide-react";
@@ -574,6 +584,20 @@ export default function PropertyDetail() {
   }, [selectedImage, images.length]);
 
   const isUnitClosed = !!currentUnit?.closedForCurrentPeriod;
+  const bungalowClosedListPrice =
+    !!currentUnit &&
+    !!data &&
+    getClosedBungalowSeasonMessageKey(currentUnit.name, data.name, isUnitClosed) != null;
+  const nightlyRegular = quotePricing?.basePrice ?? currentUnit?.basePrice ?? 0;
+  const nightlyDisplayPrice =
+    currentUnit && data
+      ? getClosedBungalowNightlyDisplayPrice(
+          currentUnit.name,
+          data.name,
+          isUnitClosed,
+          nightlyRegular,
+        )
+      : nightlyRegular;
   const canBook = !!(data && currentUnit && selectedDates) && !isUnitClosed;
   const formatDateForApi = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -742,27 +766,46 @@ export default function PropertyDetail() {
         <div className="border-b border-border bg-muted/30">
           <div className="container-max">
             <div className="flex flex-wrap items-center gap-6 py-4 md:py-5 text-sm md:text-base">
-              <div className="flex items-center gap-2 text-foreground font-medium">
-                <Users size={20} className="text-primary shrink-0" />
-                <span>{t("property.quickInfo.guests").replace("{n}", String(effectiveMaxGuests))}</span>
-              </div>
               {(() => {
                 const bedTagKey = getUnitBedTagKey(data.name, currentUnit.name);
+                const { bedroomsLine, inventoryLine } = getUnitBedDisplay(
+                  t,
+                  bedTagKey,
+                  currentUnit.bedrooms,
+                );
                 return (
-                  <div className="flex items-center gap-2 text-foreground font-medium">
-                    <Bed size={20} className="text-primary shrink-0" />
-                    <span>{bedTagKey ? t(bedTagKey) : t("property.quickInfo.bedrooms").replace("{n}", String(currentUnit.bedrooms))}</span>
-                  </div>
+                  <>
+                    <div className="flex items-center gap-2 text-foreground font-medium">
+                      <BedDouble size={20} className="text-primary shrink-0" />
+                      <span>{bedroomsLine}</span>
+                    </div>
+                    {inventoryLine ? (
+                      <div className="flex items-center gap-2 text-foreground font-medium">
+                        <Bed size={20} className="text-primary shrink-0" />
+                        <span>{inventoryLine}</span>
+                      </div>
+                    ) : null}
+                  </>
                 );
               })()}
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Bath size={20} className="text-primary shrink-0" />
                 <span>{t("property.quickInfo.bathrooms").replace("{n}", String(currentUnit.bathrooms))}</span>
               </div>
+              <div className="flex items-center gap-2 text-foreground font-medium">
+                <Users size={20} className="text-primary shrink-0" />
+                <span>{t("property.quickInfo.guests").replace("{n}", String(effectiveMaxGuests))}</span>
+              </div>
               <div className="hidden sm:flex items-center gap-4 text-muted-foreground">
-                <Wifi size={20} className="shrink-0" aria-hidden />
+                {!isSmallBungalowUnit(currentUnit.name, data.name) &&
+                  !isBigBungalowUnit(currentUnit.name, data.name) && (
+                  <Wifi size={20} className="shrink-0" aria-hidden />
+                )}
                 <Wind size={20} className="shrink-0" aria-hidden />
-                <Utensils size={20} className="shrink-0" aria-hidden />
+                {!isSmallBungalowUnit(currentUnit.name, data.name) &&
+                  !isBigBungalowUnit(currentUnit.name, data.name) && (
+                  <Utensils size={20} className="shrink-0" aria-hidden />
+                )}
                 <Waves size={20} className="shrink-0" aria-hidden />
               </div>
               <div className="flex items-center gap-2 text-muted-foreground ml-auto">
@@ -791,7 +834,7 @@ export default function PropertyDetail() {
               <>
                 {/* Header & Experience Description */}
                 <div className="mb-10">
-                  <h1 className={`text-3xl md:text-4xl font-bold text-foreground ${/small\s*bungalow|lykoskufi\s*2|lykoskufi2/i.test(currentUnit.name) ? "mb-0" : "mb-6"}`}>
+                  <h1 className={`text-3xl md:text-4xl font-bold text-foreground ${/small\s*bungalow/i.test(currentUnit.name) ? "mb-0" : "mb-6"}`}>
                     {(() => {
                       const tk = getUnitDisplayTitleKey(currentUnit.name);
                       return tk ? t(tk) : currentUnit.name;
@@ -800,10 +843,6 @@ export default function PropertyDetail() {
                   {/small\s*bungalow/i.test(currentUnit.name) && (
                     <p className="text-muted-foreground text-sm mt-1 mb-6">Studio</p>
                   )}
-                  {/lykoskufi\s*2|lykoskufi2/i.test(currentUnit.name) && (
-                    <p className="text-muted-foreground text-sm mt-1 mb-6">{t("property.tag.lykoskufi2Subtype")}</p>
-                  )}
-
                   {/* Description — from system translations (not admin panel) */}
                   <div className="space-y-5">
                     {(() => {
@@ -928,6 +967,14 @@ export default function PropertyDetail() {
                   </h2>
                   {(() => {
                     const isOgraHouse = currentUnit?.name && /ogra\s*house/i.test(currentUnit.name);
+                    const isSmallBungalowUnitFlag =
+                      !!currentUnit?.name &&
+                      !!data?.name &&
+                      isSmallBungalowUnit(currentUnit.name, data.name);
+                    const isBigBungalowUnitFlag =
+                      !!currentUnit?.name &&
+                      !!data?.name &&
+                      isBigBungalowUnit(currentUnit.name, data.name);
                     const essentialsOgra = [
                       { icon: Wifi, labelKey: "amenities.fastWifi", descKey: "amenities.fastWifiDesc" },
                       { icon: Wind, labelKey: "amenities.ac", descKey: "amenities.acDesc" },
@@ -949,6 +996,19 @@ export default function PropertyDetail() {
                       { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
                       { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
                     ];
+                    const essentialsBigBungalow = [
+                      { icon: Wind, labelKey: "amenities.acBigBungalow", descKey: "amenities.acBigBungalowDesc" },
+                      { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
+                      { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
+                      { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
+                      { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
+                    ];
+                    const essentialsSmallBungalow = [
+                      { icon: Bath, labelKey: "amenities.privateBathroom", descKey: "amenities.privateBathroomDesc" },
+                      { icon: Car, labelKey: "amenities.freeParking", descKey: "amenities.freeParkingDesc" },
+                      { icon: Ban, labelKey: "amenities.nonSmoking", descKey: "amenities.nonSmokingDesc" },
+                      { icon: PawPrint, labelKey: "amenities.petsAllowed", descKey: "amenities.petsAllowedDesc" },
+                    ];
                     const outdoorOgra = [
                       { icon: Waves, labelKey: "amenities.beachfront", descKey: "amenities.beachfrontDesc" },
                       { icon: Mountain, labelKey: "amenities.seaView", descKey: "amenities.seaViewDesc" },
@@ -959,7 +1019,13 @@ export default function PropertyDetail() {
                       { icon: MapPin, labelKey: "amenities.beachAccess", descKey: "amenities.beachAccessDesc" },
                       { icon: Mountain, labelKey: "amenities.seaView", descKey: "amenities.seaViewDesc" },
                     ];
-                    const essentials = isOgraHouse ? essentialsOgra : essentialsLykoskufi;
+                    const essentials = isOgraHouse
+                      ? essentialsOgra
+                      : isBigBungalowUnitFlag
+                        ? essentialsBigBungalow
+                        : isSmallBungalowUnitFlag
+                          ? essentialsSmallBungalow
+                          : essentialsLykoskufi;
                     const outdoor = isOgraHouse ? outdoorOgra : outdoorLykoskufi;
                     return (
                       <div className="space-y-8">
@@ -1098,20 +1164,31 @@ export default function PropertyDetail() {
                     {t("property.whyLove")}
                   </h2>
                   <ul className="space-y-3">
-                    {[
-                      "property.highlights.seaViews",
-                      "property.highlights.modernKitchen",
-                      "property.highlights.spaciousLiving",
-                      "property.highlights.privateTerrace",
-                      "property.highlights.parking",
-                    ].map((highlightKey, idx) => (
-                      <li key={idx} className="flex items-start gap-3">
-                        <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                        <span className="text-foreground">
-                          {t(highlightKey)}
-                        </span>
-                      </li>
-                    ))}
+                    {(() => {
+                      const bungalow =
+                        isSmallBungalowUnit(currentUnit.name, data.name) ||
+                        isBigBungalowUnit(currentUnit.name, data.name);
+                      const keys = [
+                        "property.highlights.seaViews",
+                        "property.highlights.modernKitchen",
+                        "property.highlights.spaciousLiving",
+                        "property.highlights.privateTerrace",
+                        "property.highlights.parking",
+                      ];
+                      const list = bungalow
+                        ? keys.filter(
+                            (k) =>
+                              k !== "property.highlights.modernKitchen" &&
+                              k !== "property.highlights.spaciousLiving",
+                          )
+                        : keys;
+                      return list.map((highlightKey, idx) => (
+                        <li key={idx} className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+                          <span className="text-foreground">{t(highlightKey)}</span>
+                        </li>
+                      ));
+                    })()}
                   </ul>
                 </div>
 
@@ -1289,12 +1366,9 @@ export default function PropertyDetail() {
                         {t("property.priceFrom")}{" "}
                       </span>
                       <span className="text-3xl font-bold text-primary">
-                        {quoteLoading
+                        {quoteLoading && !bungalowClosedListPrice
                           ? "..."
-                          : formatCurrency(
-                              quotePricing?.basePrice ?? currentUnit.basePrice,
-                              language,
-                            )}
+                          : formatCurrency(nightlyDisplayPrice, language)}
                       </span>
                       <span className="text-muted-foreground">{t("common.perNight")}</span>
                     </div>
@@ -1341,20 +1415,24 @@ export default function PropertyDetail() {
                               (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) / (1000 * 60 * 60 * 24),
                             )}{" "}
                             {t("common.nights")} ×{" "}
-                            {quoteLoading
+                            {quoteLoading && !bungalowClosedListPrice
                               ? "..."
-                              : formatCurrency(
-                                  quotePricing?.basePrice ?? currentUnit.basePrice,
-                                  language,
-                                )}
+                              : formatCurrency(nightlyDisplayPrice, language)}
                           </span>
                           <span>
-                            {quoteLoading
+                            {quoteLoading && !bungalowClosedListPrice
                               ? "..."
                               : formatCurrency(
-                                  quotePricing?.subtotal ?? Math.ceil(
-                                    (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) / (1000 * 60 * 60 * 24),
-                                  ) * currentUnit.basePrice,
+                                  (() => {
+                                    const nights = Math.ceil(
+                                      (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) /
+                                        (1000 * 60 * 60 * 24),
+                                    );
+                                    if (!bungalowClosedListPrice && quotePricing?.subtotal != null) {
+                                      return quotePricing.subtotal;
+                                    }
+                                    return nights * nightlyDisplayPrice;
+                                  })(),
                                   language,
                                 )}
                           </span>
@@ -1362,7 +1440,7 @@ export default function PropertyDetail() {
                         <div className="flex justify-between text-foreground">
                           <span>{t("checkout.cleaningFee")}</span>
                           <span>
-                            {quoteLoading
+                            {quoteLoading && !bungalowClosedListPrice
                               ? "..."
                               : formatCurrency(
                                   quotePricing?.cleaningFee ?? currentUnit.cleaningFee,
@@ -1373,13 +1451,19 @@ export default function PropertyDetail() {
                         <div className="border-t border-border pt-2 flex justify-between font-bold text-foreground">
                           <span>{t("property.totalPrice")}</span>
                           <span>
-                            {quoteLoading
+                            {quoteLoading && !bungalowClosedListPrice
                               ? "..."
                               : formatCurrency(
-                                  quotePricing?.totalPrice ??
-                                    Math.ceil(
-                                      (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) / (1000 * 60 * 60 * 24),
-                                    ) * currentUnit.basePrice + currentUnit.cleaningFee,
+                                  (() => {
+                                    const nights = Math.ceil(
+                                      (selectedDates.checkOut.getTime() - selectedDates.checkIn.getTime()) /
+                                        (1000 * 60 * 60 * 24),
+                                    );
+                                    if (!bungalowClosedListPrice && quotePricing?.totalPrice != null) {
+                                      return quotePricing.totalPrice;
+                                    }
+                                    return nights * nightlyDisplayPrice + currentUnit.cleaningFee;
+                                  })(),
                                   language,
                                 )}
                           </span>
@@ -1395,18 +1479,36 @@ export default function PropertyDetail() {
                   {isUnitClosed ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-3">
                       <p className="font-semibold text-amber-800">{t("property.roomClosed")}</p>
-                      {currentUnit?.reopenDate && (
-                        <p className="text-sm text-amber-700 mt-1">
-                          {t("property.roomReopensOn").replace(
-                            "{date}",
-                            new Date(currentUnit.reopenDate).toLocaleDateString(undefined, {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            }),
-                          )}
-                        </p>
-                      )}
+                      {(() => {
+                        const seasonKey =
+                          data && currentUnit
+                            ? getClosedBungalowSeasonMessageKey(
+                                currentUnit.name,
+                                data.name,
+                                isUnitClosed,
+                              )
+                            : null;
+                        if (seasonKey) {
+                          return (
+                            <p className="text-sm text-amber-700 mt-1">{t(seasonKey)}</p>
+                          );
+                        }
+                        if (currentUnit?.reopenDate) {
+                          return (
+                            <p className="text-sm text-amber-700 mt-1">
+                              {t("property.roomReopensOn").replace(
+                                "{date}",
+                                new Date(currentUnit.reopenDate).toLocaleDateString(undefined, {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                }),
+                              )}
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
                       <button disabled className="btn-primary w-full justify-center mt-3 opacity-50 cursor-not-allowed">
                         {t("nav.bookNow")}
                       </button>

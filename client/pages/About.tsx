@@ -62,7 +62,7 @@ export default function About() {
         <section className="relative h-[65vh] min-h-[420px] overflow-hidden">
           <img
             src="/644024829_926388910567259_6978044638543006750_n.jpg"
-            alt="Leonidion villas"
+            alt={t("about.hero.subtitle")}
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/40" />
@@ -142,7 +142,7 @@ export default function About() {
                 <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-luxury-md">
                   <img
                     src="/645696801_1911893926199490_2525005987881341297_n.jpg"
-                    alt="Villa interior"
+                    alt={t("about.interiorImageAlt")}
                     className="w-full h-full object-cover"
                   />
                 </div>

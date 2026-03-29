@@ -210,6 +210,7 @@ export type Database = {
           cancelled_at: string | null;
           created_at: string;
           updated_at: string;
+          balance_charge_attempt_count?: number;
         };
         Insert: {
           id?: string;
@@ -243,6 +244,7 @@ export type Database = {
           cancelled_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          balance_charge_attempt_count?: number;
         };
         Update: {
           id?: string;
@@ -276,6 +278,7 @@ export type Database = {
           cancelled_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          balance_charge_attempt_count?: number;
         };
       };
       payments: {

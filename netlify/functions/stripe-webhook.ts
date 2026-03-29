@@ -299,8 +299,15 @@ async function processSuccessfulPayment(
     update.deposit_paid = true;
     update.payment_status = "DEPOSIT_PAID";
     update.status = "CONFIRMED";
+    update.balance_charge_attempt_count = 0;
+    const { data: paySettings } = await supabase
+      .from("payment_settings")
+      .select("balance_charge_days_before")
+      .eq("is_active", true)
+      .maybeSingle();
+    const balDays = Number(paySettings?.balance_charge_days_before) || 21;
     const checkIn = new Date(booking.check_in_date);
-    checkIn.setDate(checkIn.getDate() - 21);
+    checkIn.setDate(checkIn.getDate() - balDays);
     update.scheduled_charge_date = checkIn.toISOString();
     update.remaining_amount = totalPrice - totalPaid;
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId);

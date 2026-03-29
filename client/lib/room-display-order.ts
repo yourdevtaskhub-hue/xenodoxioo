@@ -47,6 +47,37 @@ export function getUnitBedTagKey(propertyName: string, unitName: string): string
   return null;
 }
 
+const BED_TAG_INVENTORY_SEPARATOR = " · ";
+
+/**
+ * Splits bed tag copy so bedrooms can be shown first, then mattress/bed inventory.
+ * Tags use "inventory · bedrooms" in all locale strings.
+ */
+export function getUnitBedDisplay(
+  translate: (key: string) => string,
+  bedTagKey: string | null,
+  bedroomCount: number,
+): { bedroomsLine: string; inventoryLine: string | null } {
+  const bedroomsFromCount = translate("property.quickInfo.bedrooms").replace(
+    "{n}",
+    String(bedroomCount),
+  );
+  if (!bedTagKey) {
+    return { bedroomsLine: bedroomsFromCount, inventoryLine: null };
+  }
+  const full = translate(bedTagKey);
+  const idx = full.indexOf(BED_TAG_INVENTORY_SEPARATOR);
+  if (idx === -1) {
+    return { bedroomsLine: bedroomsFromCount, inventoryLine: full.trim() || null };
+  }
+  const inventory = full.slice(0, idx).trim();
+  const bedrooms = full.slice(idx + BED_TAG_INVENTORY_SEPARATOR.length).trim();
+  return {
+    bedroomsLine: bedrooms || bedroomsFromCount,
+    inventoryLine: inventory || null,
+  };
+}
+
 /** Translation key for unit card blurbs (property.unitDesc.ograHouse, etc.). */
 export function getUnitDescriptionKey(propertyName: string, unitName: string): string | null {
   const n = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
@@ -75,8 +106,63 @@ export function getUnitDisplayTitleKey(unitName: string): string | null {
 export function getMaxGuestsForUnit(unitName: string): number | null {
   const u = (unitName || "").toLowerCase().trim().replace(/\s+/g, " ");
   if (/small\s*bungalow/i.test(u)) return 3;
-  if ((/big\s*bungalow|μεγάλο|megalo/i.test(u)) && /bungalow/i.test(u)) return 3;
+  if ((/big\s*bungalow|μεγάλο|megalo/i.test(u)) && /bungalow/i.test(u)) return 4;
   if (/lykoskufi\s*1|lykoskufi1|lykoski\s*1/i.test(u)) return 2;
   if (/lykoskufi\s*2|lykoskufi2|lykoski\s*2/i.test(u)) return 5;
+  return null;
+}
+
+/** Big Bungalow – matches unit/property naming (excludes Small Bungalow). */
+export function isBigBungalowUnit(unitName: string, propertyName = ""): boolean {
+  const n = (s: string) => (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+  const u = n(unitName);
+  const p = n(propertyName);
+  if (!/bungalow/.test(`${u} ${p}`)) return false;
+  if (/\bsmall\s*bungalow\b|μικρό|mikro/i.test(u)) return false;
+  const big = (hay: string) =>
+    hay.includes("big") || hay.includes("large") || hay.includes("μεγάλο") || hay.includes("megalo");
+  return big(u) || big(p);
+}
+
+/** Nightly rate shown on listing/detail when Big Bungalow is in a booking-closed period. */
+export const BIG_BUNGALOW_CLOSED_DISPLAY_PRICE = 70;
+
+/** Small Bungalow — booking-closed listing price (same seasonal logic as Big, different amount). */
+export const SMALL_BUNGALOW_CLOSED_DISPLAY_PRICE = 60;
+
+/** Small Bungalow – matches unit/property naming (excludes Big Bungalow). */
+export function isSmallBungalowUnit(unitName: string, propertyName = ""): boolean {
+  if (isBigBungalowUnit(unitName, propertyName)) return false;
+  const n = (s: string) => (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+  const u = n(unitName);
+  const p = n(propertyName);
+  if (!/bungalow/.test(`${u} ${p}`)) return false;
+  const smallish = (hay: string) =>
+    /\bsmall\s*bungalow\b/.test(hay) || hay.includes("μικρό") || hay.includes("mikro");
+  return smallish(u) || smallish(p);
+}
+
+/** Nightly rate when a bungalow unit is in a server-flagged closed period. */
+export function getClosedBungalowNightlyDisplayPrice(
+  unitName: string,
+  propertyName: string,
+  isClosed: boolean,
+  regularNightly: number,
+): number {
+  if (!isClosed) return regularNightly;
+  if (isBigBungalowUnit(unitName, propertyName)) return BIG_BUNGALOW_CLOSED_DISPLAY_PRICE;
+  if (isSmallBungalowUnit(unitName, propertyName)) return SMALL_BUNGALOW_CLOSED_DISPLAY_PRICE;
+  return regularNightly;
+}
+
+/** Translation key for fixed season copy when Big/Small Bungalow is closed (reopen date hidden). */
+export function getClosedBungalowSeasonMessageKey(
+  unitName: string,
+  propertyName: string,
+  isClosed: boolean,
+): "property.bigBungalow.closedSeasonRange" | "property.smallBungalow.closedSeasonRange" | null {
+  if (!isClosed) return null;
+  if (isBigBungalowUnit(unitName, propertyName)) return "property.bigBungalow.closedSeasonRange";
+  if (isSmallBungalowUnit(unitName, propertyName)) return "property.smallBungalow.closedSeasonRange";
   return null;
 }

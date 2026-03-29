@@ -1,8 +1,14 @@
 import { supabase } from "../lib/db";
+import {
+  BALANCE_RETRY_DAYS_BEFORE_CHECK_IN,
+  addUtcCalendarDays,
+  utcCalendarDay,
+} from "../lib/balance-charge-policy";
 import { NotFoundError, AppError, ValidationError } from "../lib/errors";
 import Stripe from "stripe";
 import {
   sendBookingConfirmationEmail,
+  sendBookingCancelledUnpaidBalanceEmail,
   sendPaymentReceiptEmail,
 } from "./email.service";
 
@@ -525,6 +531,7 @@ async function updateBookingAfterPayment(
     update.deposit_paid = true;
     update.payment_status = "DEPOSIT_PAID";
     update.status = "CONFIRMED";
+    update.balance_charge_attempt_count = 0;
 
     const scheduledDate = new Date(booking.check_in_date);
     scheduledDate.setDate(scheduledDate.getDate() - settings.balanceChargeDaysBefore);
@@ -548,6 +555,7 @@ async function updateBookingAfterPayment(
     update.status = "CONFIRMED";
     update.remaining_amount = 0;
     update.payment_type = "FULL";
+    update.balance_charge_attempt_count = 0;
   }
 
   if (paymentIntent.customer) {
@@ -804,104 +812,208 @@ async function handleDispute(charge: any) {
 }
 
 // ── Charge scheduled balance payments ──────────────────────────────
+//
+// Policy: first attempt on the calendar day that is `balance_charge_days_before` (e.g. 21) before check-in;
+// if it fails, a single retry on the day that is 19 days before check-in. After the second failure the
+// booking is cancelled (dates released) and the guest is emailed.
 
-export async function chargeScheduledPayments() {
-  const today = new Date().toISOString().split("T")[0];
-  console.log(`[SCHEDULER] Checking for scheduled payments on ${today}`);
+export async function chargeScheduledPayments(): Promise<{
+  processed: number;
+  failed: number;
+  cancelled: number;
+}> {
+  const todayStr = new Date().toISOString().split("T")[0];
+  console.log(`[SCHEDULER] Balance charge job for UTC day ${todayStr}`);
+
+  const settings = await getPaymentSettings();
 
   const { data: bookings } = await supabase
     .from("bookings")
     .select("*")
     .eq("payment_status", "DEPOSIT_PAID")
     .neq("status", "CANCELLED")
-    .lte("scheduled_charge_date", new Date().toISOString());
+    .eq("balance_paid", false);
 
   if (!bookings || bookings.length === 0) {
-    console.log("[SCHEDULER] No payments to process");
-    return { processed: 0, failed: 0 };
+    console.log("[SCHEDULER] No DEPOSIT_PAID bookings with balance due");
+    return { processed: 0, failed: 0, cancelled: 0 };
   }
+
+  const now = new Date();
+  const todayUtc = utcCalendarDay(now);
 
   let processed = 0;
   let failed = 0;
+  let cancelled = 0;
 
-  for (const booking of bookings) {
-    try {
+  const insertFailedBalanceRow = async (
+    b: (typeof bookings)[number],
+    amount: number,
+    msg: string,
+    stripePiId: string | null,
+  ) => {
+    await supabase.from("payments").insert({
+      booking_id: b.id,
+      user_id: b.user_id || "00000000-0000-0000-0000-000000000000",
+      amount,
+      currency: settings.currency,
+      payment_type: "BALANCE",
+      stripe_payment_intent_id: stripePiId,
+      stripe_customer_id: b.stripe_customer_id,
+      status: "FAILED",
+      last_error: msg,
+      failure_count: 1,
+      description: `Failed scheduled balance for booking ${b.booking_number}`,
+    });
+  };
+
+  const cancelAfterTwoStrikes = async (b: (typeof bookings)[number]) => {
+    const cancellationReason =
+      "Automatic cancellation: remaining balance could not be charged after two attempts (balance due date and retry 19 days before check-in).";
+    await supabase
+      .from("bookings")
+      .update({
+        status: "CANCELLED",
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: cancellationReason,
+        is_cancelled: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", b.id);
+    cancelled++;
+    console.log(`[SCHEDULER] Booking ${b.booking_number} cancelled after failed balance retry`);
+    sendBookingCancelledUnpaidBalanceEmail(b.id).catch((e) =>
+      console.error("[SCHEDULER] Cancel email failed:", e?.message || e),
+    );
+  };
+
+  for (const bookingRow of bookings) {
+    let booking = bookingRow;
+
+    while (true) {
       const remaining = Number(booking.remaining_amount) || Number(booking.balance_amount) || 0;
-      if (remaining <= 0) {
-        console.log(`[SCHEDULER] Booking ${booking.booking_number}: no remaining amount`);
-        continue;
-      }
+      if (remaining <= 0) break;
+
+      const attempt = Number(booking.balance_charge_attempt_count) || 0;
+      const checkInDay = utcCalendarDay(booking.check_in_date);
+      const firstChargeDay = addUtcCalendarDays(checkInDay, -settings.balanceChargeDaysBefore);
+      const retryChargeDay = addUtcCalendarDays(checkInDay, -BALANCE_RETRY_DAYS_BEFORE_CHECK_IN);
+
+      const canFirst = attempt === 0 && todayUtc.getTime() >= firstChargeDay.getTime();
+      const canRetry = attempt === 1 && todayUtc.getTime() >= retryChargeDay.getTime();
+      if (!canFirst && !canRetry) break;
 
       if (!booking.stripe_customer_id || !booking.stripe_payment_method_id) {
-        console.error(`[SCHEDULER] Booking ${booking.booking_number}: missing Stripe customer/payment method`);
+        const msg = "Missing Stripe customer or saved payment method for balance charge";
+        console.error(`[SCHEDULER] Booking ${booking.booking_number}: ${msg}`);
+        await insertFailedBalanceRow(booking, remaining, msg, null);
+        if (attempt === 0) {
+          await supabase
+            .from("bookings")
+            .update({ balance_charge_attempt_count: 1, updated_at: new Date().toISOString() })
+            .eq("id", booking.id);
+          const { data: ref } = await supabase.from("bookings").select("*").eq("id", booking.id).single();
+          if (ref) booking = ref;
+          failed++;
+          continue;
+        }
+        await cancelAfterTwoStrikes(booking);
         failed++;
-        continue;
+        break;
       }
 
       const stripe = getStripe();
-      const settings = await getPaymentSettings();
       const cents = toCents(remaining);
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: cents,
-        currency: settings.currency.toLowerCase(),
-        customer: booking.stripe_customer_id,
-        payment_method: booking.stripe_payment_method_id,
-        off_session: true,
-        confirm: true,
-        metadata: {
-          bookingId: booking.id,
-          paymentType: "BALANCE",
-          bookingNumber: booking.booking_number,
-          scheduledPayment: "true",
-        },
-      });
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: cents,
+          currency: settings.currency.toLowerCase(),
+          customer: booking.stripe_customer_id,
+          payment_method: booking.stripe_payment_method_id,
+          off_session: true,
+          confirm: true,
+          metadata: {
+            bookingId: booking.id,
+            paymentType: "BALANCE",
+            bookingNumber: booking.booking_number,
+            scheduledPayment: "true",
+          },
+        });
 
-      await supabase.from("payments").insert({
-        booking_id: booking.id,
-        user_id: booking.user_id || "00000000-0000-0000-0000-000000000000",
-        amount: remaining,
-        currency: settings.currency,
-        payment_type: "BALANCE",
-        stripe_payment_intent_id: paymentIntent.id,
-        stripe_customer_id: booking.stripe_customer_id,
-        status: paymentIntent.status === "succeeded" ? "COMPLETED" : "PENDING",
-        processed_at: paymentIntent.status === "succeeded" ? new Date().toISOString() : null,
-        description: `Scheduled balance payment for booking ${booking.booking_number}`,
-      });
+        const ok = paymentIntent.status === "succeeded";
+        await supabase.from("payments").insert({
+          booking_id: booking.id,
+          user_id: booking.user_id || "00000000-0000-0000-0000-000000000000",
+          amount: remaining,
+          currency: settings.currency,
+          payment_type: "BALANCE",
+          stripe_payment_intent_id: paymentIntent.id,
+          stripe_customer_id: booking.stripe_customer_id,
+          status: ok ? "COMPLETED" : "FAILED",
+          processed_at: ok ? new Date().toISOString() : null,
+          last_error: ok ? null : `PaymentIntent status ${paymentIntent.status}`,
+          failure_count: ok ? 0 : 1,
+          description: `Scheduled balance payment for booking ${booking.booking_number}`,
+        });
 
-      if (paymentIntent.status === "succeeded") {
-        await supabase.from("bookings").update({
-          balance_paid: true,
-          payment_status: "PAID_FULL",
-          remaining_amount: 0,
-          total_paid: Number(booking.total_paid || 0) + remaining,
-        }).eq("id", booking.id);
+        if (ok) {
+          const totalPaid = Number(booking.total_paid || 0) + remaining;
+          await supabase
+            .from("bookings")
+            .update({
+              balance_paid: true,
+              payment_status: "PAID_FULL",
+              remaining_amount: 0,
+              total_paid: totalPaid,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", booking.id);
 
-        console.log(`[SCHEDULER] Successfully charged ${remaining} EUR for booking ${booking.booking_number}`);
-        processed++;
+          console.log(`[SCHEDULER] Charged ${remaining} ${settings.currency} for ${booking.booking_number}`);
+          processed++;
+          sendEmailsAfterPayment(booking.id, "BALANCE", {}).catch((e) =>
+            console.error("[SCHEDULER] Receipt email failed:", e?.message || e),
+          );
+          break;
+        }
+
+        const errMsg = `PaymentIntent not succeeded: ${paymentIntent.status}`;
+        if (attempt === 0) {
+          await supabase
+            .from("bookings")
+            .update({ balance_charge_attempt_count: 1, updated_at: new Date().toISOString() })
+            .eq("id", booking.id);
+          const { data: ref } = await supabase.from("bookings").select("*").eq("id", booking.id).single();
+          if (ref) booking = ref;
+          failed++;
+          continue;
+        }
+        await cancelAfterTwoStrikes(booking);
+        failed++;
+        break;
+      } catch (err: any) {
+        console.error(`[SCHEDULER] Balance charge error ${booking.booking_number}:`, err.message);
+        await insertFailedBalanceRow(booking, remaining, err.message || "Stripe error", null);
+        if (attempt === 0) {
+          await supabase
+            .from("bookings")
+            .update({ balance_charge_attempt_count: 1, updated_at: new Date().toISOString() })
+            .eq("id", booking.id);
+          const { data: ref } = await supabase.from("bookings").select("*").eq("id", booking.id).single();
+          if (ref) booking = ref;
+          failed++;
+          continue;
+        }
+        await cancelAfterTwoStrikes(booking);
+        failed++;
+        break;
       }
-    } catch (err: any) {
-      console.error(`[SCHEDULER] Failed to charge booking ${booking.booking_number}:`, err.message);
-
-      await supabase.from("payments").insert({
-        booking_id: booking.id,
-        user_id: booking.user_id || "00000000-0000-0000-0000-000000000000",
-        amount: Number(booking.remaining_amount) || 0,
-        currency: "EUR",
-        payment_type: "BALANCE",
-        status: "FAILED",
-        last_error: err.message,
-        failure_count: 1,
-        description: `Failed scheduled balance for booking ${booking.booking_number}`,
-      });
-
-      failed++;
     }
   }
 
-  console.log(`[SCHEDULER] Completed: ${processed} processed, ${failed} failed`);
-  return { processed, failed };
+  console.log(`[SCHEDULER] Done: ${processed} charged, ${failed} failed attempts, ${cancelled} auto-cancelled`);
+  return { processed, failed, cancelled };
 }
 
 // ── Confirm payment status (client-side fallback for webhooks) ─────

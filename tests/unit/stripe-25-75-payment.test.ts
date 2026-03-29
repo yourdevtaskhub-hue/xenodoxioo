@@ -12,6 +12,11 @@
 
 import { describe, it, expect } from "vitest";
 import { calculatePaymentAmounts, PAYMENT_CONFIG } from "../../client/lib/stripe";
+import {
+  addUtcCalendarDays,
+  isEligibleForBalanceChargeWindow,
+  utcCalendarDay,
+} from "../../server/lib/balance-charge-policy";
 
 // ── Pure helpers (mirror server logic exactly) ────────────────────────────
 
@@ -37,21 +42,7 @@ function calculateScheduledChargeDate(
   return d;
 }
 
-// Filter logic used by chargeScheduledPayments - CANCELLED must be excluded
-function isEligibleForScheduledCharge(booking: {
-  status: string;
-  payment_status: string;
-  scheduled_charge_date: string | Date | null;
-  remaining_amount: number;
-}): boolean {
-  if (booking.status === "CANCELLED") return false;
-  if (booking.payment_status !== "DEPOSIT_PAID") return false;
-  if (booking.remaining_amount <= 0) return false;
-  if (!booking.scheduled_charge_date) return false;
-
-  const scheduled = new Date(booking.scheduled_charge_date);
-  return scheduled <= new Date();
-}
+const isEligibleForScheduledCharge = isEligibleForBalanceChargeWindow;
 
 // ── 25% / 75% Split Tests ───────────────────────────────────────────────
 
@@ -187,106 +178,148 @@ describe("Full Payment Flow (≤21 days = FULL)", () => {
 // ── CANCELLATION: 75% Must NEVER Be Charged ──────────────────────────────
 
 describe("Cancellation - 75% Never Charged for CANCELLED", () => {
+  const today = new Date(Date.UTC(2026, 5, 10));
+
   it("CANCELLED booking is NOT eligible for scheduled charge", () => {
+    const checkIn = addUtcCalendarDays(today, 30);
     const cancelled = {
       status: "CANCELLED",
       payment_status: "DEPOSIT_PAID",
-      scheduled_charge_date: new Date().toISOString(),
+      balance_paid: false,
+      check_in_date: checkIn.toISOString(),
       remaining_amount: 543.37,
     };
-    expect(isEligibleForScheduledCharge(cancelled)).toBe(false);
+    expect(isEligibleForScheduledCharge(cancelled, today)).toBe(false);
   });
 
-  it("CONFIRMED booking IS eligible when scheduled date has passed", () => {
+  it("CONFIRMED booking IS eligible on first charge day (check-in − 21 UTC days)", () => {
+    const checkIn = addUtcCalendarDays(today, 21);
     const confirmed = {
       status: "CONFIRMED",
       payment_status: "DEPOSIT_PAID",
-      scheduled_charge_date: new Date(Date.now() - 86400000).toISOString(), // yesterday
+      balance_paid: false,
+      balance_charge_attempt_count: 0,
+      check_in_date: checkIn.toISOString(),
       remaining_amount: 543.37,
     };
-    expect(isEligibleForScheduledCharge(confirmed)).toBe(true);
+    expect(isEligibleForScheduledCharge(confirmed, today)).toBe(true);
   });
 
-  it("CANCELLED excluded when mixed with CONFIRMED (simulates chargeScheduledPayments query)", () => {
-    const today = new Date();
+  it("CANCELLED excluded when mixed with CONFIRMED (simulates in-memory filter)", () => {
+    const checkIn = addUtcCalendarDays(today, 21);
     const bookings = [
       {
         id: "1",
         status: "CONFIRMED",
         payment_status: "DEPOSIT_PAID",
-        scheduled_charge_date: today,
+        balance_paid: false,
+        balance_charge_attempt_count: 0,
+        check_in_date: checkIn.toISOString(),
         remaining_amount: 543,
       },
       {
         id: "2",
         status: "CANCELLED",
         payment_status: "DEPOSIT_PAID",
-        scheduled_charge_date: today,
+        balance_paid: false,
+        balance_charge_attempt_count: 0,
+        check_in_date: checkIn.toISOString(),
         remaining_amount: 543,
       },
       {
         id: "3",
         status: "CONFIRMED",
         payment_status: "PAID_FULL",
-        scheduled_charge_date: today,
+        balance_paid: true,
+        check_in_date: checkIn.toISOString(),
         remaining_amount: 0,
       },
     ];
 
-    const eligible = bookings.filter(isEligibleForScheduledCharge);
+    const eligible = bookings.filter((b) => isEligibleForScheduledCharge(b, today));
     expect(eligible.length).toBe(1);
     expect(eligible[0].id).toBe("1");
     expect(eligible[0].status).toBe("CONFIRMED");
   });
 
   it("PAID_FULL is not eligible (no remaining amount)", () => {
+    const checkIn = addUtcCalendarDays(today, 21);
     const paidFull = {
       status: "CONFIRMED",
       payment_status: "PAID_FULL",
-      scheduled_charge_date: new Date().toISOString(),
+      balance_paid: true,
+      check_in_date: checkIn.toISOString(),
       remaining_amount: 0,
     };
-    expect(isEligibleForScheduledCharge(paidFull)).toBe(false);
+    expect(isEligibleForScheduledCharge(paidFull, today)).toBe(false);
   });
 
-  it("future scheduled date is not yet eligible", () => {
+  it("check-in too far in future: not yet first charge day", () => {
+    const checkIn = addUtcCalendarDays(today, 60);
     const future = {
       status: "CONFIRMED",
       payment_status: "DEPOSIT_PAID",
-      scheduled_charge_date: new Date(Date.now() + 30 * 86400000).toISOString(),
+      balance_paid: false,
+      balance_charge_attempt_count: 0,
+      check_in_date: checkIn.toISOString(),
       remaining_amount: 543,
     };
-    expect(isEligibleForScheduledCharge(future)).toBe(false);
+    expect(isEligibleForScheduledCharge(future, today)).toBe(false);
+  });
+
+  it("attempt 1 becomes eligible on retry day (check-in − 19 UTC days)", () => {
+    const checkIn = addUtcCalendarDays(today, 19);
+    const retryBooking = {
+      status: "CONFIRMED",
+      payment_status: "DEPOSIT_PAID",
+      balance_paid: false,
+      balance_charge_attempt_count: 1,
+      check_in_date: checkIn.toISOString(),
+      remaining_amount: 400,
+    };
+    expect(isEligibleForScheduledCharge(retryBooking, today)).toBe(true);
+  });
+
+  it("attempt 1 is NOT eligible before retry day", () => {
+    const checkIn = addUtcCalendarDays(today, 20);
+    const retryBooking = {
+      status: "CONFIRMED",
+      payment_status: "DEPOSIT_PAID",
+      balance_paid: false,
+      balance_charge_attempt_count: 1,
+      check_in_date: checkIn.toISOString(),
+      remaining_amount: 400,
+    };
+    expect(isEligibleForScheduledCharge(retryBooking, today)).toBe(false);
   });
 });
 
 // ── chargeScheduledPayments Query Logic (mirrors server) ───────────────────
 
 describe("chargeScheduledPayments Query Logic", () => {
-  /**
-   * Server uses:
-   * .eq("payment_status", "DEPOSIT_PAID")
-   * .neq("status", "CANCELLED")
-   * .lte("scheduled_charge_date", now)
-   */
-  it("query filters match: status != CANCELLED, DEPOSIT_PAID, scheduled <= today", () => {
+  const refDay = new Date(Date.UTC(2026, 8, 1));
+
+  it("DB filter: DEPOSIT_PAID + unpaid balance; eligibility uses check-in vs today", () => {
+    const checkIn = addUtcCalendarDays(refDay, 21);
     const valid = {
       status: "CONFIRMED",
       payment_status: "DEPOSIT_PAID",
-      scheduled_charge_date: new Date().toISOString(),
+      balance_paid: false,
+      balance_charge_attempt_count: 0,
+      check_in_date: checkIn.toISOString(),
       remaining_amount: 100,
     };
-    const invalidStatus = { ...valid, status: "CANCELLED" };
-    const invalidPayment = { ...valid, payment_status: "PAID_FULL" };
+    const invalidStatus = { ...valid, status: "CANCELLED" as const };
+    const invalidPayment = { ...valid, payment_status: "PAID_FULL" as const };
     const invalidFuture = {
       ...valid,
-      scheduled_charge_date: new Date(Date.now() + 86400000).toISOString(),
+      check_in_date: addUtcCalendarDays(refDay, 40).toISOString(),
     };
 
-    expect(isEligibleForScheduledCharge(valid)).toBe(true);
-    expect(isEligibleForScheduledCharge(invalidStatus)).toBe(false);
-    expect(isEligibleForScheduledCharge(invalidPayment)).toBe(false);
-    expect(isEligibleForScheduledCharge(invalidFuture)).toBe(false);
+    expect(isEligibleForScheduledCharge(valid, refDay)).toBe(true);
+    expect(isEligibleForScheduledCharge(invalidStatus, refDay)).toBe(false);
+    expect(isEligibleForScheduledCharge(invalidPayment, refDay)).toBe(false);
+    expect(isEligibleForScheduledCharge(invalidFuture, refDay)).toBe(false);
   });
 });
 

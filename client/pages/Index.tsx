@@ -1,6 +1,10 @@
 import Layout from "@/components/Layout";
 import { apiUrl, imageUrl } from "@/lib/api";
-import { sortByRoomOrder, getUnitDisplayTitleKey } from "@/lib/room-display-order";
+import {
+  sortByRoomOrder,
+  getUnitDisplayTitleKey,
+  getClosedBungalowNightlyDisplayPrice,
+} from "@/lib/room-display-order";
 import { Link } from "react-router-dom";
 import {
   Calendar,
@@ -32,6 +36,23 @@ type PropertySummary = {
   unitsCount: number;
   startingFrom: number | null;
 };
+
+type FeaturedPropertyCard = PropertySummary & {
+  _unitId?: string;
+  closedForCurrentPeriod?: boolean;
+  /** Property (parent) name — with unit `name`, identifies Big/Small Bungalow closed pricing. */
+  parentPropertyName?: string;
+};
+
+function getFeaturedCardDisplayPrice(card: FeaturedPropertyCard): number | null {
+  if (card.startingFrom == null) return null;
+  return getClosedBungalowNightlyDisplayPrice(
+    card.name,
+    card.parentPropertyName ?? "",
+    !!card.closedForCurrentPeriod,
+    card.startingFrom,
+  );
+}
 
 function BeachLightbox({ images, initialIndex, onClose }: { images: string[]; initialIndex: number; onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -208,7 +229,7 @@ export default function Index() {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState("2");
-  const [featuredProperties, setFeaturedProperties] = useState<PropertySummary[]>([]);
+  const [featuredProperties, setFeaturedProperties] = useState<FeaturedPropertyCard[]>([]);
   const [propertiesLoading, setPropertiesLoading] = useState(true);
   const [propertiesError, setPropertiesError] = useState<string | null>(null);
   const { language, t } = useLanguage();
@@ -251,10 +272,20 @@ export default function Index() {
         }
 
         const json = await response.json();
-        const properties = (json.data ?? []) as Array<PropertySummary & { units?: Array<{ id: string; name: string; images?: string[]; basePrice?: number }> }>;
+        const properties = (json.data ?? []) as Array<
+          PropertySummary & {
+            units?: Array<{
+              id: string;
+              name: string;
+              images?: string[];
+              basePrice?: number;
+              closedForCurrentPeriod?: boolean;
+            }>;
+          }
+        >;
 
         // Flatten to one card per unit (same as /properties), then sort
-        const flattened: (PropertySummary & { _unitId?: string })[] = [];
+        const flattened: FeaturedPropertyCard[] = [];
         properties.forEach((prop) => {
           const units = prop.units ?? [];
           if (units.length > 0) {
@@ -270,10 +301,12 @@ export default function Index() {
                 mainImage: (unit.images?.[0] ?? prop.mainImage ?? (prop as { main_image?: string }).main_image) as string,
                 unitsCount: 1,
                 startingFrom: unit.basePrice ?? prop.startingFrom ?? null,
+                closedForCurrentPeriod: !!unit.closedForCurrentPeriod,
+                parentPropertyName: prop.name,
               });
             });
           } else {
-            flattened.push({ ...prop } as PropertySummary & { _unitId?: string });
+            flattened.push({ ...prop } as FeaturedPropertyCard);
           }
         });
 
@@ -424,51 +457,54 @@ export default function Index() {
         ) : (
           <>
             <div className="grid md:grid-cols-3 gap-6">
-              {featuredProperties.map((property, idx) => (
-                <Link
-                  key={(property as { _unitId?: string })._unitId ?? property.id}
-                  to={`/properties/${property.id}`}
-                  className="card-hover overflow-hidden group"
-                  onMouseEnter={() => fetch(apiUrl(`/api/properties/id/${property.id}`))}
-                >
-                  {/* Image */}
-                  <div className="relative h-64 overflow-hidden bg-muted">
-                    <img
-                      src={imageUrl(property.mainImage ?? (property as { main_image?: string }).main_image)}
-                      alt={(() => {
-                        const tk = getUnitDisplayTitleKey(property.name);
-                        return tk ? t(tk) : property.name;
-                      })()}
-                      loading={idx < 3 ? "eager" : "lazy"}
-                      decoding="async"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    {property.startingFrom != null && (
-                      <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
-                        <span className="text-primary font-bold">
-                          {t("property.priceFrom")} {formatCurrency(property.startingFrom, language)}
-                        </span>
-                        <span className="text-muted-foreground text-sm">
-                          {" "}{t("common.perNight")}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+              {featuredProperties.map((property, idx) => {
+                const displayPrice = getFeaturedCardDisplayPrice(property);
+                return (
+                  <Link
+                    key={property._unitId ?? property.id}
+                    to={`/properties/${property.id}`}
+                    className="card-hover overflow-hidden group"
+                    onMouseEnter={() => fetch(apiUrl(`/api/properties/id/${property.id}`))}
+                  >
+                    {/* Image */}
+                    <div className="relative h-64 overflow-hidden bg-muted">
+                      <img
+                        src={imageUrl(property.mainImage ?? (property as { main_image?: string }).main_image)}
+                        alt={(() => {
+                          const tk = getUnitDisplayTitleKey(property.name);
+                          return tk ? t(tk) : property.name;
+                        })()}
+                        loading={idx < 3 ? "eager" : "lazy"}
+                        decoding="async"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      {displayPrice != null && (
+                        <div className="absolute top-4 right-4 bg-white rounded-lg px-3 py-1 shadow-lg">
+                          <span className="text-primary font-bold">
+                            {t("property.priceFrom")} {formatCurrency(displayPrice, language)}
+                          </span>
+                          <span className="text-muted-foreground text-sm">
+                              {" "}{t("common.perNight")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Content */}
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-foreground mb-2">
-                      {(() => {
-                        const tk = getUnitDisplayTitleKey(property.name);
-                        return tk ? t(tk) : property.name;
-                      })()}
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      {property.location || `${property.city}, ${property.country}`}
-                    </p>
-                  </div>
-                </Link>
-              ))}
+                    {/* Content */}
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold text-foreground mb-2">
+                        {(() => {
+                          const tk = getUnitDisplayTitleKey(property.name);
+                          return tk ? t(tk) : property.name;
+                        })()}
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        {property.location || `${property.city}, ${property.country}`}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
 
             <div className="mt-12 text-center">

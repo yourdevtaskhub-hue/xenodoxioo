@@ -30,9 +30,8 @@ export default function LegalDetails() {
               </h2>
             </div>
             <div className="space-y-6 text-sm">
-              {/* Lykoskufi Villas */}
               <div className="border-b border-border pb-4">
-                <h3 className="font-semibold text-foreground mb-2">Lykoskufi Villas</h3>
+                <h3 className="font-semibold text-foreground mb-2">{t("legal.lykoskufiLicenseHeading")}</h3>
                 <p className="text-muted-foreground">
                   <span className="font-medium text-foreground">{t("legal.eot")}</span> 1365294
                 </p>

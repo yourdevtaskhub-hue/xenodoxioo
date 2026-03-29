@@ -513,7 +513,7 @@ export default function Dashboard() {
                           onChange={(e) =>
                             setProfileForm((p) => ({ ...p, phone: e.target.value }))
                           }
-                          placeholder="+30 6994998081"
+                          placeholder="+30 6974637217"
                           className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
                         />
                       </div>

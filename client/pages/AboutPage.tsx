@@ -62,7 +62,7 @@ export default function About() {
         <section className="relative h-[65vh] min-h-[420px] overflow-hidden">
           <img
             src="/644024829_926388910567259_6978044638543006750_n.jpg"
-            alt="Leonidion villas"
+            alt={t("about.hero.subtitle")}
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/40" />
@@ -145,7 +145,7 @@ export default function About() {
                 <div className="aspect-[4/5] rounded-lg overflow-hidden shadow-luxury-md">
                   <img
                     src="/aboutus.jpg"
-                    alt="Villa interior"
+                    alt={t("about.interiorImageAlt")}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -175,11 +175,11 @@ export default function About() {
 
               {[
                 { key: "ograHouse", paras: ["p1", "p2"] },
-                { key: "smallBungalow", paras: ["p1", "p2", "p3", "p4"] },
-                { key: "bigBungalow", paras: ["p1", "p2", "p3", "p4"] },
-                { key: "lykoskufi1", paras: ["p1", "p2"] },
-                { key: "lykoskufi2", paras: ["p1", "p2"] },
                 { key: "lykoskufi5", paras: ["p1", "p2", "p3"] },
+                { key: "lykoskufi2", paras: ["p1", "p2"] },
+                { key: "lykoskufi1", paras: ["p1", "p2"] },
+                { key: "bigBungalow", paras: ["p1", "p2", "p3", "p4"] },
+                { key: "smallBungalow", paras: ["p1", "p2", "p3", "p4"] },
               ].map((prop, i) => {
                 const title = t(`about.${prop.key}.title`);
                 return (

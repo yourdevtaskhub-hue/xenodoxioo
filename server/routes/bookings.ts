@@ -2,8 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validation";
 import { authenticate, optionalAuthenticate } from "../middleware/auth";
+import { supabase } from "../lib/db";
 import * as bookingService from "../services/booking.service";
 import * as customOfferService from "../services/custom-offer.service";
+import { getOccupiedDateRangesIncludingExternal } from "../services/ical.service";
 
 const router = Router();
 
@@ -51,14 +53,20 @@ const cancelBookingSchema = z.object({
 
 router.get("/occupied-dates", async (req, res, next) => {
   try {
-    const unitId = req.query.unitId as string;
-    if (!unitId) return res.status(400).json({ success: false, error: "unitId required" });
-    const ranges = await bookingService.getOccupiedDateRanges(unitId);
-    const mapped = (ranges || []).map((r: any) => ({
-      start: (r.check_in_date || "").slice(0, 10),
-      end: (r.check_out_date || "").slice(0, 10),
-    }));
-    res.json({ success: true, data: mapped });
+    const unitIdParam = String(req.query.unitId || "").trim();
+    if (!unitIdParam) return res.status(400).json({ success: false, error: "unitId required" });
+
+    // Match Netlify /api: UUID or unit slug, internal bookings + external_bookings (iCal sync)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(unitIdParam);
+    let unitId = unitIdParam;
+    if (!isUuid) {
+      const { data: unit } = await supabase.from("units").select("id").eq("slug", unitIdParam).single();
+      if (!unit) return res.status(404).json({ success: false, error: "Unit not found" });
+      unitId = unit.id;
+    }
+
+    const ranges = await getOccupiedDateRangesIncludingExternal(supabase, unitId);
+    res.json({ success: true, data: ranges });
   } catch (error) {
     next(error);
   }

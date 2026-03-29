@@ -3,12 +3,15 @@ import { apiUrl, imageUrl, placeholderImage } from "@/lib/api";
 import {
   sortByRoomOrder,
   getUnitBedTagKey,
+  getUnitBedDisplay,
   getUnitDescriptionKey,
   getUnitDisplayTitleKey,
   getMaxGuestsForUnit,
+  getClosedBungalowNightlyDisplayPrice,
+  getClosedBungalowSeasonMessageKey,
 } from "@/lib/room-display-order";
-import { Link, useSearchParams } from "react-router-dom";
-import { Users, Bed, Bath } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Users, Bed, BedDouble, Bath } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import formatCurrency from "@/lib/currency";
@@ -37,8 +40,7 @@ type UnitWithProperty = {
 
 export default function Properties() {
   const [searchParams] = useSearchParams();
-  const [priceFilter, setPriceFilter] = useState("all");
-  const [bedroomFilter, setBedroomFilter] = useState("all");
+  const navigate = useNavigate();
   const [units, setUnits] = useState<UnitWithProperty[]>([]);
   const [loadingUnits, setLoadingUnits] = useState(true);
   const [unitsError, setUnitsError] = useState<string | null>(null);
@@ -50,17 +52,6 @@ export default function Properties() {
   const checkIn = searchParams.get("checkIn");
   const checkOut = searchParams.get("checkOut");
   const guests = searchParams.get("guests");
-
-  if (priceFilter !== "all") {
-    const [min, max] = priceFilter.split("-").map(Number);
-    filtered = filtered.filter(
-      (p) => p.basePrice >= min && (!max || p.basePrice <= max),
-    );
-  }
-
-  if (bedroomFilter !== "all") {
-    filtered = filtered.filter((p) => p.bedrooms >= parseInt(bedroomFilter));
-  }
 
   if (guests) {
     const guestCount = parseInt(guests);
@@ -138,93 +129,6 @@ export default function Properties() {
 
       {/* Main Content */}
       <div className="container-max py-8">
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Sidebar Filters */}
-          <div className="lg:col-span-1">
-            <div className="bg-card border border-border rounded-lg p-6 sticky top-20">
-              <h3 className="text-lg font-bold text-foreground mb-6">
-                {t("common.select")}
-              </h3>
-
-              {/* Price Filter */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-foreground mb-4">
-                  {t("properties.filter.price")}
-                </h4>
-                <div className="space-y-2">
-                  {[
-                    { value: "all", label: "All Prices" },
-                    { value: "0-150", label: `Under ${formatCurrency(150, language)}` },
-                    { value: "150-250", label: `${formatCurrency(150, language)} - ${formatCurrency(250, language)}` },
-                    { value: "250-500", label: `${formatCurrency(250, language)} - ${formatCurrency(500, language)}` },
-                  ].map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex items-center gap-2 cursor-pointer"
-                    >
-                      <input
-                        type="radio"
-                        name="price"
-                        value={option.value}
-                        checked={priceFilter === option.value}
-                        onChange={(e) => setPriceFilter(e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-foreground text-sm">
-                        {option.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bedroom Filter */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-foreground mb-4">{t("properties.filter.bedrooms")}</h4>
-                <div className="space-y-2">
-                  {[
-                    { value: "all", label: "All Bedrooms" },
-                    { value: "2", label: "2+ Bedrooms" },
-                    { value: "3", label: "3+ Bedrooms" },
-                    { value: "4", label: "4+ Bedrooms" },
-                  ].map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex items-center gap-2 cursor-pointer"
-                    >
-                      <input
-                        type="radio"
-                        name="bedroom"
-                        value={option.value}
-                        checked={bedroomFilter === option.value}
-                        onChange={(e) => setBedroomFilter(e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-foreground text-sm">
-                        {option.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Reset Filters */}
-              {(priceFilter !== "all" || bedroomFilter !== "all") && (
-                <button
-                  onClick={() => {
-                    setPriceFilter("all");
-                    setBedroomFilter("all");
-                  }}
-                  className="w-full py-2 text-primary font-semibold hover:text-primary/80 transition-colors border-t border-border pt-4"
-                >
-                  {t("properties.filter.clearFilters")}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Properties Grid */}
-          <div className="lg:col-span-3">
             {loadingUnits ? (
               <div className="space-y-6 animate-pulse">
                 {[1, 2, 3, 4].map((i) => (
@@ -253,13 +157,11 @@ export default function Properties() {
                   {t("properties.noResults")}
                 </p>
                 <button
-                  onClick={() => {
-                    setPriceFilter("all");
-                    setBedroomFilter("all");
-                  }}
+                  type="button"
+                  onClick={() => navigate("/properties")}
                   className="btn-secondary"
                 >
-                  {t("properties.filter.clearFilters")}
+                  {t("properties.browseAll")}
                 </button>
               </div>
             ) : (
@@ -314,51 +216,90 @@ export default function Properties() {
                             {/small\s*bungalow/i.test(unit.name) && (
                               <p className="text-sm text-muted-foreground mt-0.5">Studio</p>
                             )}
-                            {/lykoskufi\s*2|lykoskufi2/i.test(unit.name) && (
-                              <p className="text-sm text-muted-foreground mt-0.5">{t("property.tag.lykoskufi2Subtype")}</p>
-                            )}
                             <div className="flex flex-wrap gap-4 mt-2 text-sm">
-                              <div className="flex items-center gap-2 text-foreground">
-                                <Bed size={16} className="text-primary" />
-                                {(() => {
-                                  const bedTagKey = getUnitBedTagKey(unit.property?.name ?? "", unit.name);
-                                  return bedTagKey ? t(bedTagKey) : `${unit.bedrooms} ${unit.bedrooms === 1 ? t("common.bedroom") : t("common.bedrooms")}`;
-                                })()}
-                              </div>
-                              <div className="flex items-center gap-2 text-foreground">
-                                <Bath size={16} className="text-primary" />
-                                {unit.bathrooms}{" "}
-                                {unit.bathrooms === 1
-                                  ? t("common.bathroom")
-                                  : t("common.bathrooms")}
-                              </div>
-                              <div className="flex items-center gap-2 text-foreground">
-                                <Users size={16} className="text-primary" />
-                                {getMaxGuestsForUnit(unit.name) ?? unit.maxGuests}{" "}
-                                {t("common.guests")}
-                              </div>
+                              {(() => {
+                                const bedTagKey = getUnitBedTagKey(
+                                  unit.property?.name ?? "",
+                                  unit.name,
+                                );
+                                const { bedroomsLine, inventoryLine } = getUnitBedDisplay(
+                                  t,
+                                  bedTagKey,
+                                  unit.bedrooms,
+                                );
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-2 text-foreground">
+                                      <BedDouble size={16} className="text-primary shrink-0" />
+                                      {bedroomsLine}
+                                    </div>
+                                    {inventoryLine ? (
+                                      <div className="flex items-center gap-2 text-foreground">
+                                        <Bed size={16} className="text-primary shrink-0" />
+                                        {inventoryLine}
+                                      </div>
+                                    ) : null}
+                                    <div className="flex items-center gap-2 text-foreground">
+                                      <Bath size={16} className="text-primary shrink-0" />
+                                      {unit.bathrooms}{" "}
+                                      {unit.bathrooms === 1
+                                        ? t("common.bathroom")
+                                        : t("common.bathrooms")}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-foreground">
+                                      <Users size={16} className="text-primary shrink-0" />
+                                      {getMaxGuestsForUnit(unit.name) ?? unit.maxGuests}{" "}
+                                      {t("common.guests")}
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div className="text-right">
                             {unit.closedForCurrentPeriod && (
                               <div className="mb-2 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
                                 {t("property.roomClosed")}
-                                {unit.reopenDate && (
-                                  <span className="block mt-0.5">
-                                    {t("property.roomReopensOn").replace(
-                                      "{date}",
-                                      new Date(unit.reopenDate).toLocaleDateString(undefined, {
-                                        day: "numeric",
-                                        month: "short",
-                                        year: "numeric",
-                                      }),
-                                    )}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const sk = getClosedBungalowSeasonMessageKey(
+                                    unit.name,
+                                    unit.property?.name ?? "",
+                                    true,
+                                  );
+                                  if (sk) {
+                                    return (
+                                      <span className="block mt-0.5 font-normal">{t(sk)}</span>
+                                    );
+                                  }
+                                  if (unit.reopenDate) {
+                                    return (
+                                      <span className="block mt-0.5">
+                                        {t("property.roomReopensOn").replace(
+                                          "{date}",
+                                          new Date(unit.reopenDate).toLocaleDateString(undefined, {
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric",
+                                          }),
+                                        )}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             )}
                             <div className="text-2xl font-bold text-primary">
-                              {t("property.priceFrom")} {formatCurrency(unit.basePrice, language)}
+                              {t("property.priceFrom")}{" "}
+                              {formatCurrency(
+                                getClosedBungalowNightlyDisplayPrice(
+                                  unit.name,
+                                  unit.property?.name ?? "",
+                                  !!unit.closedForCurrentPeriod,
+                                  unit.basePrice,
+                                ),
+                                language,
+                              )}
                             </div>
                             <p className="text-muted-foreground text-sm">
                               {t("common.perNight")}
@@ -385,19 +326,16 @@ export default function Properties() {
                       </div>
 
                       {/* CTA */}
-                      <div className="flex items-center justify-between pt-4 border-t border-border">
-                        <div className="text-sm text-muted-foreground">
-                          {t("properties.available")}
-                        </div>
-                        <button className="btn-primary">View Details</button>
+                      <div className="flex items-center justify-end pt-4 border-t border-border">
+                        <button type="button" className="btn-primary">
+                          View Details
+                        </button>
                       </div>
                     </div>
                   </Link>
                 ))}
               </div>
             )}
-          </div>
-        </div>
       </div>
     </Layout>
   );

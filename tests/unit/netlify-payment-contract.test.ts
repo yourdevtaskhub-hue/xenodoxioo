@@ -44,10 +44,11 @@ describe("Netlify stripe-webhook - scheduled_charge_date 21 days", () => {
   const path = join(__dirname, "../../netlify/functions/stripe-webhook.ts");
   const source = readFileSync(path, "utf-8");
 
-  it("sets scheduled_charge_date on DEPOSIT payment (for balance charge 21 days before)", () => {
+  it("sets scheduled_charge_date on DEPOSIT from payment_settings.balance_charge_days_before", () => {
     expect(source).toContain("scheduled_charge_date");
     expect(source).toContain("setDate");
-    expect(source).toContain("- 21");
+    expect(source).toContain("balance_charge_days_before");
+    expect(source).toContain("balDays");
   });
 
   it("updates DEPOSIT_PAID and stores stripe_payment_method_id for future charge", () => {

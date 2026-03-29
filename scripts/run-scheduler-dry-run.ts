@@ -1,15 +1,27 @@
 /**
- * DRY RUN: Τρέχει το ίδιο query με το chargeScheduledPayments ΑΛΛΑ δεν κάνει charge.
- * Χρησιμοποιείται για να δεις ΤΙ θα χρεωθεί όταν φτάσει η ώρα.
+ * DRY RUN: Δείχνει ποιες κρατήσεις θα «έφταναν» στον scheduler χωρίς Stripe charge.
+ *
+ * Λογική (ίδια με chargeScheduledPayments): DEPOSIT_PAID, όχι CANCELLED, balance_paid=false,
+ * και σήμερα (UTC ημερολογιακά) >= μέρα 1ης προσπάθειας (check-in − balance_charge_days_before)
+ * εάν attempt=0, ή >= μέρα 2ης (check-in − 19) εάν attempt=1.
  *
  * Τρέξε: pnpm exec tsx scripts/run-scheduler-dry-run.ts
- *
- * Το query εξαιρεί CANCELLED - αν έχεις ακυρωμένη κράτηση με scheduled_charge_date σήμερα,
- * ΔΕΝ θα εμφανιστεί εδώ (και άρα ΔΕΝ θα χρεωθούν τα 75%).
  */
 
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
+
+const BALANCE_RETRY_DAYS_BEFORE_CHECK_IN = 19;
+
+function utcCalendarDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+function addUtcCalendarDays(day: Date, delta: number): Date {
+  const t = new Date(day.getTime());
+  t.setUTCDate(t.getUTCDate() + delta);
+  return t;
+}
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -22,19 +34,29 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function main() {
-  const now = new Date().toISOString();
-  const today = now.split("T")[0];
+  const todayUtc = utcCalendarDay(new Date());
+  const todayStr = todayUtc.toISOString().split("T")[0];
 
-  console.log("\n📅 [DRY RUN] Έλεγχος scheduled payments για:", today);
-  console.log("   (ίδιο query με chargeScheduledPayments - χωρίς πραγματική χρέωση)\n");
+  console.log("\n📅 [DRY RUN] UTC ημέρα:", todayStr);
+  console.log("   Φίλτρο DB: DEPOSIT_PAID, status≠CANCELLED, balance_paid=false\n");
 
-  // Ακριβώς το ίδιο query με payment.service.ts chargeScheduledPayments
+  const { data: paySettings } = await supabase
+    .from("payment_settings")
+    .select("balance_charge_days_before")
+    .eq("is_active", true)
+    .maybeSingle();
+  const balDays = Number(paySettings?.balance_charge_days_before) || 21;
+  console.log(`   balance_charge_days_before (1η προσπάθεια): ${balDays}`);
+  console.log(`   2η προσπάθεια: ${BALANCE_RETRY_DAYS_BEFORE_CHECK_IN} ημέρες πριν το check-in (UTC ημέρα)\n`);
+
   const { data: bookings, error } = await supabase
     .from("bookings")
-    .select("id, booking_number, status, payment_status, scheduled_charge_date, remaining_amount, guest_email")
+    .select(
+      "id, booking_number, status, payment_status, balance_paid, balance_charge_attempt_count, remaining_amount, check_in_date, guest_email, scheduled_charge_date",
+    )
     .eq("payment_status", "DEPOSIT_PAID")
     .neq("status", "CANCELLED")
-    .lte("scheduled_charge_date", now);
+    .eq("balance_paid", false);
 
   if (error) {
     console.error("❌ Σφάλμα query:", error.message);
@@ -42,32 +64,40 @@ async function main() {
   }
 
   if (!bookings || bookings.length === 0) {
-    console.log("✅ Δεν βρέθηκαν κρατήσεις για χρέωση σήμερα.");
-    console.log("   (DEPOSIT_PAID + status ≠ CANCELLED + scheduled_charge_date ≤ σήμερα)\n");
+    console.log("✅ Δεν υπάρχουν κρατήσεις με ανεξόφλητο υπόλοιπο (DEPOSIT_PAID & balance unpaid).\n");
     return;
   }
 
-  console.log(`⚠️  Θα χρεωθούν ${bookings.length} κρατήσεις (τα 75%):\n`);
+  let wouldCharge = 0;
   for (const b of bookings) {
-    console.log(`   • ${b.booking_number} | ${b.guest_email} | €${b.remaining_amount} | status=${b.status}`);
+    const remaining = Number(b.remaining_amount) || 0;
+    if (remaining <= 0) continue;
+
+    const attempt = Number(b.balance_charge_attempt_count) || 0;
+    const checkInDay = utcCalendarDay(new Date(b.check_in_date));
+    const firstDay = addUtcCalendarDays(checkInDay, -balDays);
+    const retryDay = addUtcCalendarDays(checkInDay, -BALANCE_RETRY_DAYS_BEFORE_CHECK_IN);
+
+    const canFirst = attempt === 0 && todayUtc.getTime() >= firstDay.getTime();
+    const canRetry = attempt === 1 && todayUtc.getTime() >= retryDay.getTime();
+    const eligible = canFirst || canRetry;
+
+    if (eligible) wouldCharge++;
+
+    const phase =
+      attempt === 0
+        ? `1η (από ${firstDay.toISOString().slice(0, 10)})`
+        : attempt === 1
+          ? `2η retry (από ${retryDay.toISOString().slice(0, 10)})`
+          : `attempt=${attempt}`;
+
+    console.log(
+      `${eligible ? "⚡" : "○"} ${b.booking_number} | ${b.guest_email} | €${remaining} | ${phase} | ${eligible ? "ΘΑ τρέξει charge σήμερα" : "όχι σήμερα"}`,
+    );
   }
 
-  // Επιπλέον: δείξε τι κρατήσεις ΔΕΝ περιλαμβάνονται (CANCELLED με scheduled_charge_date σήμερα)
-  const { data: cancelledToday } = await supabase
-    .from("bookings")
-    .select("id, booking_number, status, scheduled_charge_date, remaining_amount")
-    .eq("payment_status", "DEPOSIT_PAID")
-    .eq("status", "CANCELLED")
-    .lte("scheduled_charge_date", now);
-
-  if (cancelledToday && cancelledToday.length > 0) {
-    console.log("\n🔒 Ακυρωμένες που ΔΕΝ χρεώνονται (σωστά εξαιρούνται):");
-    for (const c of cancelledToday) {
-      console.log(`   • ${c.booking_number} | CANCELLED | €${c.remaining_amount} - ΟΧΙ χρέωση ✓`);
-    }
-  }
-
-  console.log("\n[DRY RUN - καμία χρέωση δεν έγινε]\n");
+  console.log(`\nΣύνολο με υπόλοιπο: ${bookings.length}, επιλέξιμες για προσπάθεια σήμερα: ${wouldCharge}`);
+  console.log("[DRY RUN - καμία χρέωση]\n");
 }
 
 main().catch((err) => {
