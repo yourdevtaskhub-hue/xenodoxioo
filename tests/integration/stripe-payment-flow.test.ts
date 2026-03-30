@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import Stripe from "stripe";
 
+/** Live keys create real PaymentIntents — run these tests only with `sk_test_...` in .env. */
+const STRIPE_LIVE = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") === true;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_placeholder";
 
 let stripe: Stripe;
@@ -9,7 +11,7 @@ beforeAll(() => {
   stripe = new Stripe(STRIPE_SECRET_KEY);
 });
 
-describe("Stripe Payment Integration", () => {
+describe.skipIf(STRIPE_LIVE)("Stripe Payment Integration", () => {
   describe("PaymentIntent Creation", () => {
     it("creates a payment intent with EUR currency", async () => {
       const pi = await stripe.paymentIntents.create({
@@ -176,9 +178,13 @@ describe("Stripe Payment Integration", () => {
 });
 
 describe("Stripe Webhook Verification", () => {
+  // Local-only Stripe instance (no API calls) — do not rely on the skipped suite's `stripe`.
+  const stripeLocal = new Stripe("sk_test_constructEvent_only_not_for_api", {
+    apiVersion: "2024-11-20.acacia",
+  });
+
   it("validates webhook secret requirement", () => {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    // Webhook secret should either be set or empty (for dev mode)
     expect(typeof webhookSecret === "string" || webhookSecret === undefined).toBe(true);
   });
 
@@ -189,7 +195,7 @@ describe("Stripe Webhook Verification", () => {
     });
 
     expect(() => {
-      stripe.webhooks.constructEvent(testPayload, "invalid_sig", "whsec_test");
+      stripeLocal.webhooks.constructEvent(testPayload, "invalid_sig", "whsec_test");
     }).toThrow();
   });
 });

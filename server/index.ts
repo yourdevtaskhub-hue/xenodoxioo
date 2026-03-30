@@ -28,7 +28,7 @@ function validateStripeConfig() {
 
   if (!secretKey) {
     console.log("║ ✗ STRIPE_SECRET_KEY          — MISSING       ║");
-    console.log("║   Add sk_test_... to .env                    ║");
+    console.log("║   Add sk_test_... or sk_live_... to env      ║");
   } else {
     const isTest = secretKey.startsWith("sk_test_");
     console.log(`║ ✓ STRIPE_SECRET_KEY          — ${isTest ? "TEST MODE" : "LIVE MODE"}   ║`);

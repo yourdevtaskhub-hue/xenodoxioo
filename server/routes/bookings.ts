@@ -6,6 +6,7 @@ import { supabase } from "../lib/db";
 import * as bookingService from "../services/booking.service";
 import * as customOfferService from "../services/custom-offer.service";
 import { getOccupiedDateRangesIncludingExternal } from "../services/ical.service";
+import { routeParam } from "../lib/route-param";
 
 const router = Router();
 
@@ -220,7 +221,7 @@ router.get("/:id", optionalAuthenticate, async (req, res, next) => {
     if (!opts) {
       return res.status(401).json({ success: false, error: "Sign in or provide email" });
     }
-    const booking = await bookingService.getBookingById(req.params.id, opts);
+    const booking = await bookingService.getBookingById(routeParam(req.params.id), opts);
     res.json({ success: true, data: booking });
   } catch (error) {
     next(error);
@@ -240,7 +241,7 @@ router.post("/:id/cancel", optionalAuthenticate, validate(cancelBookingSchema), 
     if (!opts) {
       return res.status(401).json({ success: false, error: "Sign in or provide guest email" });
     }
-    const result = await bookingService.cancelBooking(req.params.id, opts, reason);
+    const result = await bookingService.cancelBooking(routeParam(req.params.id), opts, reason);
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);

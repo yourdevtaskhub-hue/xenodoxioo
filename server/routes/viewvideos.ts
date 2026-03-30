@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import { routeParam } from "../lib/route-param";
 
 const router = Router();
 const VIEW_VIDEOS_DIR = path.join(process.cwd(), "public", "viewvideos");
@@ -15,7 +16,7 @@ const ALLOWED_VIDEOS = [
 ];
 
 router.get("/:filename", (req: Request, res: Response) => {
-  const filename = decodeURIComponent(req.params.filename);
+  const filename = decodeURIComponent(routeParam(req.params.filename));
   if (!ALLOWED_VIDEOS.includes(filename)) {
     return res.status(404).json({ error: "Video not found" });
   }

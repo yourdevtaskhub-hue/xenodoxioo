@@ -252,11 +252,9 @@ DATABASE_URL="postgresql://..." pnpm exec prisma db push
 - [ ] Admin login
 - [ ] Φόρμα επικοινωνίας / inquiries
 
-### 9.2 Stripe Test σε Live Mode
+### 9.2 Stripe Test vs Live
 
-Στο Live mode μπορείτε να χρησιμοποιήσετε [test cards](https://stripe.com/docs/testing#cards):
-- `4242 4242 4242 4242` — επιτυχία
-- `4000 0000 0000 0002` — άρνηση
+Οι [δοκιμαστικές κάρτες](https://stripe.com/docs/testing#cards) λειτουργούν **μόνο σε Test mode**. Στο **Live mode** οι πληρωμές είναι πραγματικές· για δοκιμή χρησιμοποιήστε Test mode ή πολύ μικρή πραγματική χρέωση με δική σας κάρτα.
 
 ---
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validation";
 import { supabase } from "../lib/db";
+import { routeParam } from "../lib/route-param";
 import { sendInquiryNotificationEmail, sendInquiryReplyEmail } from "../services/email.service";
 import * as customOfferService from "../services/custom-offer.service";
 
@@ -99,7 +100,7 @@ router.post("/", validate(createInquirySchema), async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = routeParam(req.params.id);
     const email = req.query.email as string;
 
     const { data: inquiry } = await supabase
@@ -138,7 +139,7 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/:id/guest-reply", validate(guestReplySchema), async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = routeParam(req.params.id);
     const guestEmail = String(req.body.guestEmail || "").trim();
     const message = String(req.body.message || "").trim();
 
@@ -211,10 +212,11 @@ router.get("/admin/list", async (req, res, next) => {
 
 router.get("/admin/:id", async (req, res, next) => {
   try {
+    const id = routeParam(req.params.id);
     const { data: inquiry } = await supabase
       .from("inquiries")
       .select("*, property:properties(name, location)")
-      .eq("id", req.params.id)
+      .eq("id", id)
       .single();
 
     if (!inquiry) {
@@ -225,12 +227,12 @@ router.get("/admin/:id", async (req, res, next) => {
     await supabase
       .from("inquiries")
       .update({ admin_last_viewed_at: new Date().toISOString() })
-      .eq("id", req.params.id);
+      .eq("id", id);
 
     const { data: messages } = await supabase
       .from("inquiry_messages")
       .select("*")
-      .eq("inquiry_id", req.params.id)
+      .eq("inquiry_id", id)
       .order("created_at", { ascending: true });
 
     res.json({
@@ -249,7 +251,7 @@ router.get("/admin/:id", async (req, res, next) => {
 
 router.post("/admin/:id/custom-offer", validate(customOfferSchema), async (req, res, next) => {
   try {
-    const { id: inquiryId } = req.params;
+    const inquiryId = routeParam(req.params.id);
     const { unitId, checkInDate, checkOutDate, guests, customTotalEur } = req.body;
 
     const offer = await customOfferService.createCustomOffer(
@@ -284,7 +286,7 @@ router.post("/admin/:id/custom-offer", validate(customOfferSchema), async (req, 
 
 router.post("/admin/:id/reply", validate(replySchema), async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = routeParam(req.params.id);
     const { message } = req.body;
 
     const { data: inquiry } = await supabase
@@ -334,7 +336,8 @@ router.post("/admin/:id/reply", validate(replySchema), async (req, res, next) =>
 router.put("/admin/:id/status", async (req, res, next) => {
   try {
     const { status } = req.body;
-    await supabase.from("inquiries").update({ status }).eq("id", req.params.id);
+    const id = routeParam(req.params.id);
+    await supabase.from("inquiries").update({ status }).eq("id", id);
     res.json({ success: true });
   } catch (error) {
     next(error);

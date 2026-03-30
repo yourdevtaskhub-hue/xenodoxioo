@@ -5,6 +5,7 @@ import { validate } from "../middleware/validation";
 import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import * as paymentService from "../services/payment.service";
 import { supabase } from "../lib/db";
+import { routeParam } from "../lib/route-param";
 
 const router = Router();
 
@@ -129,7 +130,7 @@ router.post(
 
 router.get("/history/:bookingId", optionalAuthenticate, async (req, res, next) => {
   try {
-    const result = await paymentService.getPaymentHistory(req.params.bookingId);
+    const result = await paymentService.getPaymentHistory(routeParam(req.params.bookingId));
     res.json({ success: true, data: result });
   } catch (error) {
     next(error);
