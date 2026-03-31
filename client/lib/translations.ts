@@ -9,6 +9,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.myProfile": "My Profile",
     "nav.signIn": "Sign In",
     "nav.bookNow": "Book Now",
+    "seo.homeTitle": "LEONIDIONHOUSES - Unique Accommodations in Leonidion",
 
     // Homepage
     "home.hero.brandTitle": "leonidionhouses",
@@ -975,6 +976,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.myProfile": "Mon profil",
     "nav.signIn": "Se connecter",
     "nav.bookNow": "Réserver maintenant",
+    "seo.homeTitle": "LEONIDIONHOUSES - Hébergements uniques au Leonidion",
 
     "home.hero.brandTitle": "leonidionhouses",
     "home.hero.tagline": "Confort - Intimité - Sérénité",
@@ -1881,6 +1883,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.myProfile": "Mein Profil",
     "nav.signIn": "Anmelden",
     "nav.bookNow": "Jetzt buchen",
+    "seo.homeTitle": "LEONIDIONHOUSES - Einzigartige Unterkünfte in Leonidion",
 
     "home.hero.brandTitle": "leonidionhouses",
     "home.hero.tagline": "Komfort - Privatsphäre - Gelassenheit",
@@ -2774,6 +2777,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.myProfile": "Το προφίλ μου",
     "nav.signIn": "Σύνδεση",
     "nav.bookNow": "Κάντε κράτηση τώρα",
+    "seo.homeTitle": "LEONIDIONHOUSES - Unique accommodations rentals in Leonidion ",
 
     "home.hero.brandTitle": "leonidionhouses",
     "home.hero.tagline": "Άνεση - Ιδιωτικότητα - Γαλήνη",

@@ -322,6 +322,14 @@ export default function Index() {
     loadProperties();
   }, [t]);
 
+  const defaultDocTitle = "LEONIDIONHOUSES - Μοναδικά Καταλύματα";
+  useEffect(() => {
+    document.title = t("seo.homeTitle");
+    return () => {
+      document.title = defaultDocTitle;
+    };
+  }, [language, t]);
+
   return (
     <Layout>
       {/* Hero Section */}
