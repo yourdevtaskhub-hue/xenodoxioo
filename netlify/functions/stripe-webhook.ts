@@ -49,7 +49,14 @@ export const handler = async (event: any) => {
       const charge = stripeEvent.data.object as Stripe.Charge;
       if (charge.payment_intent) {
         const piId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent.id;
-        await processSuccessfulPayment(supabase, stripe, piId, charge.id);
+        // Custom offers are fulfilled on payment_intent.succeeded (pending row is deleted there).
+        // Stripe also sends charge.succeeded — running again would log a false "missing pending" error.
+        const piMeta = await stripe.paymentIntents.retrieve(piId);
+        if (piMeta.metadata?.type === "custom_offer" || piMeta.metadata?.offerToken) {
+          console.log("[WEBHOOK] Skipping charge.succeeded for custom_offer PI (already handled):", piId);
+        } else {
+          await processSuccessfulPayment(supabase, stripe, piId, charge.id);
+        }
       }
     }
   } catch (err: any) {
@@ -89,10 +96,28 @@ async function processOfferPayment(
     .from("pending_offer_checkouts")
     .select("*")
     .eq("stripe_payment_intent_id", paymentIntentId)
-    .single();
+    .maybeSingle();
 
   if (!pending) {
-    console.error("[WEBHOOK-OFFER] No pending_offer_checkouts record for PI", paymentIntentId, "- create-intent-from-offer may not have run or used different DB");
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("id, status, stripe_charge_id")
+      .eq("stripe_payment_intent_id", paymentIntentId)
+      .maybeSingle();
+    if (existingPayment?.status === "COMPLETED") {
+      if (chargeId && !existingPayment.stripe_charge_id) {
+        await supabase.from("payments").update({ stripe_charge_id: chargeId }).eq("id", existingPayment.id);
+        console.log("[WEBHOOK-OFFER] Backfilled stripe_charge_id for PI", paymentIntentId);
+      } else {
+        console.log("[WEBHOOK-OFFER] Idempotent skip — offer already fulfilled for PI", paymentIntentId);
+      }
+      return;
+    }
+    console.error(
+      "[WEBHOOK-OFFER] No pending_offer_checkouts record for PI",
+      paymentIntentId,
+      "- create-intent-from-offer may not have run or used different DB"
+    );
     return;
   }
   console.log("[WEBHOOK-OFFER] Found pending record, offer_token:", pending.offer_token);

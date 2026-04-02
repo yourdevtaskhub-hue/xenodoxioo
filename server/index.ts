@@ -12,6 +12,7 @@ import { bookingRouter } from "./routes/bookings";
 import { propertiesRouter } from "./routes/properties";
 import { unitsRouter } from "./routes/units";
 import { inquiryRouter } from "./routes/inquiries";
+import contactRouter from "./routes/contact";
 import { cancelBookingRouter } from "./routes/cancel-booking";
 import viewVideosRouter from "./routes/viewvideos";
 import { startScheduler } from "./services/scheduler";
@@ -141,6 +142,7 @@ export function createServer() {
   app.use("/api/properties", propertiesRouter);
   app.use("/api/units", unitsRouter);
   app.use("/api/inquiries", inquiryRouter);
+  app.use("/api/contact", contactRouter);
   app.use("/api/cancel-booking", cancelBookingRouter);
 
   app.use(errorHandler);

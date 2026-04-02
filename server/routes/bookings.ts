@@ -149,6 +149,14 @@ router.post("/quote", validate(quoteSchema), async (req, res, next) => {
       return res.status(400).json({ success: false, error: "Check-out must be after check-in" });
     }
 
+    const availability = await bookingService.checkAvailability(unitId, checkIn, checkOut);
+    if (!availability.isAvailable) {
+      return res.status(409).json({
+        success: false,
+        error: availability.reason || "Dates not available",
+      });
+    }
+
     const pricing = await bookingService.calculateBookingPrice(unitId, checkIn, checkOut, guests, couponCode);
 
     res.json({

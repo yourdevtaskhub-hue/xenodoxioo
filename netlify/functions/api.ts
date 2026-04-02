@@ -118,6 +118,54 @@ export const handler = async (event: any, context: any) => {
       }
     }
 
+    // POST /api/contact — public contact page form → info@leonidionhouses.com (Resend)
+    if (path === '/api/contact' && method === 'POST') {
+      let raw: Record<string, unknown>;
+      try {
+        raw = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
+      } catch {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Invalid JSON' })
+        };
+      }
+      try {
+        const { sendContactFormEmail } = await import('../../server/services/email.service');
+        const result = await sendContactFormEmail({
+          name: String(raw.name ?? ''),
+          email: String(raw.email ?? ''),
+          phone: raw.phone != null && raw.phone !== '' ? String(raw.phone) : undefined,
+          message: String(raw.message ?? '')
+        });
+        if (!result.ok) {
+          const status =
+            result.error === 'Email service not configured'
+              ? 503
+              : result.error === 'Failed to send message'
+                ? 502
+                : 400;
+          return {
+            statusCode: status,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ success: false, error: result.error || 'Failed to send' })
+          };
+        }
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true })
+        };
+      } catch (err: any) {
+        console.error(`❌ [${requestId}] /api/contact:`, err?.message || err);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Internal error' })
+        };
+      }
+    }
+
     // Route handling
     if (path === '/api/properties' || path === '/properties') {
       // Fetch properties with units
@@ -720,7 +768,18 @@ export const handler = async (event: any, context: any) => {
             body: JSON.stringify({ success: false, error: 'Invalid dates' })
           };
         }
-        const { calculateBookingPrice } = await import('../../server/services/booking.service');
+        const { calculateBookingPrice, checkAvailability } = await import('../../server/services/booking.service');
+        const availability = await checkAvailability(unitId, checkIn, checkOut);
+        if (!availability.isAvailable) {
+          return {
+            statusCode: 409,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              success: false,
+              error: availability.reason || 'Dates not available'
+            })
+          };
+        }
         const pricing = await calculateBookingPrice(unitId, checkIn, checkOut, Number(guests) || 1, couponCode);
         return {
           statusCode: 200,

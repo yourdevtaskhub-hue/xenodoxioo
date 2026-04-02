@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiUrl } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -11,6 +11,22 @@ function localCalendarDayKey(year: number, monthIndex: number, day: number): str
   const m = String(monthIndex + 1).padStart(2, "0");
   const d = String(day).padStart(2, "0");
   return `${year}-${m}-${d}`;
+}
+
+/** Each night stayed is check-in .. check-out (exclusive): same half-open semantics as API ranges [start, end). */
+function stayRangeContainsOccupiedNight(
+  checkIn: Date,
+  checkOut: Date,
+  occupiedRanges: { start: string; end: string }[],
+): boolean {
+  const cur = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
+  const end = new Date(checkOut.getFullYear(), checkOut.getMonth(), checkOut.getDate());
+  while (cur < end) {
+    const key = localCalendarDayKey(cur.getFullYear(), cur.getMonth(), cur.getDate());
+    if (occupiedRanges.some((range) => key >= range.start && key < range.end)) return true;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return false;
 }
 
 interface AvailabilityCalendarProps {
@@ -29,26 +45,65 @@ export default function AvailabilityCalendar({
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [occupiedRanges, setOccupiedRanges] = useState<{ start: string; end: string }[]>([]);
+  const [occupancyReady, setOccupancyReady] = useState(() => !unitId);
   const [minNightsError, setMinNightsError] = useState(false);
+  const [rangeContainsUnavailable, setRangeContainsUnavailable] = useState(false);
+
+  const onSelectRef = useRef(onSelectDates);
+  const onInvalidRef = useRef(onInvalidSelection);
+  useEffect(() => {
+    onSelectRef.current = onSelectDates;
+    onInvalidRef.current = onInvalidSelection;
+  });
 
   useEffect(() => {
     if (!unitId) {
       setOccupiedRanges([]);
+      setOccupancyReady(true);
       return;
     }
+    setOccupancyReady(false);
     const fetchOccupied = async () => {
       try {
         const res = await fetch(apiUrl(`/api/bookings/occupied-dates?unitId=${encodeURIComponent(unitId)}`));
         if (res.ok) {
           const json = await res.json();
           setOccupiedRanges(json.data || []);
+        } else {
+          setOccupiedRanges([]);
         }
       } catch {
         setOccupiedRanges([]);
+      } finally {
+        setOccupancyReady(true);
       }
     };
     fetchOccupied();
   }, [unitId]);
+
+  // After occupancy is known, validate the full stay (all nights) and sync parent — covers slow fetch & iCal updates.
+  useEffect(() => {
+    if (!checkIn || !checkOut || !occupancyReady) return;
+
+    const crosses =
+      occupiedRanges.length > 0 && stayRangeContainsOccupiedNight(checkIn, checkOut, occupiedRanges);
+    if (crosses) {
+      setRangeContainsUnavailable(true);
+      setMinNightsError(false);
+      onInvalidRef.current?.();
+      return;
+    }
+    setRangeContainsUnavailable(false);
+
+    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    if (nights < MIN_NIGHTS) {
+      setMinNightsError(true);
+      onInvalidRef.current?.();
+      return;
+    }
+    setMinNightsError(false);
+    onSelectRef.current?.(checkIn, checkOut);
+  }, [checkIn, checkOut, occupancyReady, occupiedRanges]);
 
   const daysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -75,26 +130,22 @@ export default function AvailabilityCalendar({
       setCheckIn(selectedDate);
       setCheckOut(null);
       setMinNightsError(false);
+      setRangeContainsUnavailable(false);
     } else if (selectedDate > checkIn) {
-      const nights = Math.ceil((selectedDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-      if (nights < MIN_NIGHTS) {
-        setCheckOut(selectedDate);
-        setMinNightsError(true);
-        onInvalidSelection?.();
-      } else {
-        setCheckOut(selectedDate);
-        setMinNightsError(false);
-        onSelectDates?.(checkIn, selectedDate);
-      }
+      setCheckOut(selectedDate);
+      setMinNightsError(false);
+      setRangeContainsUnavailable(false);
     } else {
       setCheckIn(selectedDate);
       setCheckOut(null);
       setMinNightsError(false);
+      setRangeContainsUnavailable(false);
     }
   };
 
   const isInRange = (day: number) => {
     if (!checkIn || !checkOut) return false;
+    if (rangeContainsUnavailable || minNightsError) return false;
     const date = new Date(
       currentMonth.getFullYear(),
       currentMonth.getMonth(),
@@ -236,6 +287,12 @@ export default function AvailabilityCalendar({
         </div>
       )}
 
+      {rangeContainsUnavailable && checkIn && checkOut && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm font-medium text-red-800">{t("calendar.rangeContainsUnavailable")}</p>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="border-t border-border pt-4 space-y-2 text-xs">
         <div className="flex items-center gap-2">
@@ -257,8 +314,8 @@ export default function AvailabilityCalendar({
         </div>
       </div>
 
-      {/* Selected Dates Display */}
-      {checkIn && checkOut && (
+      {/* Selected Dates Display — hide summary when range is invalid */}
+      {checkIn && checkOut && !minNightsError && !rangeContainsUnavailable && (
         <div className="mt-6 p-4 bg-primary/5 rounded-lg">
           <p className="text-sm text-muted-foreground mb-1">Your Dates:</p>
           <p className="font-semibold text-foreground">

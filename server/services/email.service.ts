@@ -574,3 +574,64 @@ export async function sendAdminAlertEmail(
     type: "ADMIN_ALERT",
   });
 }
+
+function escapeHtmlText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Public /contact form — delivers to inbox (default info@leonidionhouses.com). Does not use email_logs.
+ */
+export async function sendContactFormEmail(params: {
+  name: string;
+  email: string;
+  phone?: string;
+  message: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const name = params.name.trim().slice(0, 200);
+  const email = params.email.trim().slice(0, 320);
+  const message = params.message.trim().slice(0, 10000);
+  const phone = params.phone?.trim().slice(0, 50) || undefined;
+  if (!name || !email || !message) {
+    return { ok: false, error: "Missing required fields" };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Invalid email" };
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[CONTACT] RESEND_API_KEY not set");
+    return { ok: false, error: "Email service not configured" };
+  }
+
+  const to = (process.env.CONTACT_INBOX_EMAIL || "info@leonidionhouses.com").trim();
+  const resend = new Resend(apiKey);
+  const from = `${FROM_NAME} <${FROM_EMAIL}>`;
+  const html = `
+    <h2>Contact form — leonidionhouses.com</h2>
+    <p><strong>Name:</strong> ${escapeHtmlText(name)}</p>
+    <p><strong>Email:</strong> ${escapeHtmlText(email)}</p>
+    ${phone ? `<p><strong>Phone:</strong> ${escapeHtmlText(phone)}</p>` : ""}
+    <p><strong>Message:</strong></p>
+    <p style="white-space:pre-wrap">${escapeHtmlText(message)}</p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from,
+    to: [to],
+    replyTo: email,
+    subject: `Contact: ${name.slice(0, 80)}`,
+    html,
+  });
+
+  if (error) {
+    console.error("[CONTACT] Resend error:", error);
+    return { ok: false, error: "Failed to send message" };
+  }
+  return { ok: true };
+}

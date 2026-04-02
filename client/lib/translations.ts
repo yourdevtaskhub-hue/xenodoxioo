@@ -816,6 +816,8 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "calendar.bookedUnavailable": "Booked / unavailable",
     "calendar.minNightsRequired": "Minimum stay is 7 nights. Please select more dates.",
+    "calendar.rangeContainsUnavailable":
+      "You cannot stay across booked or unavailable dates. Choose one continuous available period.",
     "calendar.checkInAdvanceDays": "Check-in must be at least 3 days from today.",
 
     // Inquiry form
@@ -967,6 +969,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "contact.banner.callNow": "Call now",
     "contact.success.title": "Message Sent",
     "contact.success.desc": "Thank you. We will be in touch shortly.",
+    "contact.form.sending": "Sending…",
+    "contact.form.errorSend": "Could not send your message. Please try again or email us directly.",
   },
 
   fr: {
@@ -1702,6 +1706,8 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "calendar.bookedUnavailable": "Réservé / indisponible",
     "calendar.minNightsRequired": "Séjour minimum de 7 nuits. Veuillez sélectionner plus de dates.",
+    "calendar.rangeContainsUnavailable":
+      "Vous ne pouvez pas séjourner sur des dates réservées ou indisponibles. Choisissez une période continue disponible.",
     "calendar.checkInAdvanceDays": "L'arrivée doit être au moins 3 jours à partir d'aujourd'hui.",
 
     "admin.title": "Panneau d'administration",
@@ -1844,6 +1850,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "contact.banner.callNow": "Appelez maintenant",
     "contact.success.title": "Message envoyé",
     "contact.success.desc": "Merci. Nous vous contacterons sous peu.",
+    "contact.form.sending": "Envoi en cours…",
+    "contact.form.errorSend": "Impossible d’envoyer votre message. Réessayez ou écrivez-nous directement.",
 
     // Inquiry form
     "inquiry.title": "Prévoyez un long séjour ? Envoyez-nous un message",
@@ -2558,6 +2566,8 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "calendar.bookedUnavailable": "Gebucht / nicht verfügbar",
     "calendar.minNightsRequired": "Mindestaufenthalt 7 Nächte. Bitte wählen Sie mehr Daten.",
+    "calendar.rangeContainsUnavailable":
+      "Ein Aufenthalt darf nicht über gebuchte oder gesperrte Tage führen. Wählen Sie einen durchgehend freien Zeitraum.",
     "calendar.checkInAdvanceDays": "Die Anreise muss mindestens 3 Tage ab heute sein.",
 
     "admin.title": "Admin-Panel",
@@ -2738,6 +2748,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "contact.banner.callNow": "Jetzt anrufen",
     "contact.success.title": "Nachricht gesendet",
     "contact.success.desc": "Vielen Dank. Wir werden uns in Kürze bei Ihnen melden.",
+    "contact.form.sending": "Wird gesendet…",
+    "contact.form.errorSend": "Nachricht konnte nicht gesendet werden. Bitte erneut versuchen oder uns direkt per E-Mail schreiben.",
 
     // Inquiry form
     "inquiry.title": "Planen Sie einen längeren Aufenthalt? Schreiben Sie uns",
@@ -3675,9 +3687,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "contact.banner.callNow": "Καλέστε τώρα",
     "contact.success.title": "Το μήνυμα στάλθηκε",
     "contact.success.desc": "Σας ευχαριστούμε. Θα επικοινωνήσουμε μαζί σας σύντομα.",
+    "contact.form.sending": "Αποστολή…",
+    "contact.form.errorSend": "Δεν ήταν δυνατή η αποστολή του μηνύματος. Δοκιμάστε ξανά ή στείλτε μας email απευθείας.",
 
     "calendar.bookedUnavailable": "Κρατημένα / μη διαθέσιμα",
     "calendar.minNightsRequired": "Η ελάχιστη διαμονή είναι 7 ημέρες. Παρακαλώ επιλέξτε περισσότερες ημέρες.",
+    "calendar.rangeContainsUnavailable":
+      "Δεν μπορείτε να διαμείνετε σε εύρος που περιλαμβάνει κρατημένες ή μη διαθέσιμες ημερομηνίες. Επιλέξτε μία συνεχή διαθέσιμη περίοδο.",
     "calendar.checkInAdvanceDays": "Η ημερομηνία άφιξης πρέπει να είναι τουλάχιστον 3 ημέρες από σήμερα.",
 
     // Inquiry form

@@ -3,16 +3,45 @@ import { MapPin, Phone, Mail, Send, MessageCircle } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useState } from "react";
 import Layout from "@/components/Layout";
-import { CONTACT_ADDRESS_MAP_URL } from "@/lib/api";
+import { apiUrl, CONTACT_ADDRESS_MAP_URL } from "@/lib/api";
 
 export default function Contact() {
   const { t } = useLanguage();
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSending(true);
+    setSendError(null);
+    try {
+      const res = await fetch(apiUrl("/api/contact"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || undefined,
+          message: formData.message.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSendError(typeof data.error === "string" ? data.error : t("contact.form.errorSend"));
+        return;
+      }
+      if (!data.success) {
+        setSendError(t("contact.form.errorSend"));
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setSendError(t("contact.form.errorSend"));
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -74,6 +103,11 @@ export default function Contact() {
                         {t("contact.form.subtitle")}
                       </p>
                       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+                        {sendError ? (
+                          <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">
+                            {sendError}
+                          </p>
+                        ) : null}
                         <div>
                           <label className="block text-sm font-medium text-foreground mb-1.5">
                             {t("contact.form.name")} <span className="text-muted-foreground">*</span>
@@ -123,8 +157,8 @@ export default function Contact() {
                             required
                           />
                         </div>
-                        <button type="submit" className="luxury-btn-primary w-full">
-                          {t("contact.form.submit")}
+                        <button type="submit" disabled={sending} className="luxury-btn-primary w-full disabled:opacity-60 disabled:pointer-events-none">
+                          {sending ? t("contact.form.sending") : t("contact.form.submit")}
                         </button>
                         <p className="text-xs text-muted-foreground text-center">
                           {t("contact.form.privacy")}
