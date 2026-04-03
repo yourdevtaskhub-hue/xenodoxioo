@@ -14,12 +14,7 @@ const FROM_EMAIL = resolveFromEmail();
 const FROM_NAME = process.env.FROM_NAME || "LEONIDIONHOUSES";
 
 function getFrontendUrl(): string {
-  return (
-    process.env.FRONTEND_URL ||
-    (process.env.NODE_ENV === "production"
-      ? "https://www.leonidionhouses.com"
-      : "http://localhost:8080")
-  );
+  return process.env.FRONTEND_URL || "https://www.leonidionhouses.com";
 }
 
 interface EmailOptions {
