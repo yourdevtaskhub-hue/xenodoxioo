@@ -56,6 +56,10 @@ exports.handler = async function () {
       for (const uid of uids) {
         try {
           const raw = await client.fetchOne(uid, { source: true, flags: true }, { uid: true });
+          if (!raw || !raw.source) {
+            console.warn("[INBOUND] UID " + uid + " has no source, skipping");
+            continue;
+          }
           const parsed = await simpleParser(raw.source);
           const subject = parsed.subject || "";
           const senderAddr = parsed.from?.value?.[0]?.address || "";
