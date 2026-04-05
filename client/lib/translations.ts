@@ -518,9 +518,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.section.users.help": "Manage user accounts that can sign in to the site.",
     "admin.section.inquiries.help": "Read messages from guests and send replies or special offers.",
     "admin.section.settings.help": "Tax percentages, deposits, and payment rules for bookings.",
-    "admin.inquiriesNewBadgeOne": "1 new inquiry",
-    "admin.inquiriesNewBadgeMany": "{count} new inquiries",
-    "admin.inquiriesUnreadBanner": "You have unread guest messages or new inquiry activity ({count}). Open an inquiry below to review.",
+    "admin.inquiriesNewBadgeOne": "1 new enquiry",
+    "admin.inquiriesNewBadgeMany": "{count} new enquiries",
+    "admin.inquiriesUnreadBanner": "You have unread guest messages or new enquiry activity ({count}). Open an enquiry below to review.",
     "admin.prevMonth": "Previous month",
     "admin.nextMonth": "Next month",
     "admin.refreshPanel": "Refresh all",
@@ -639,10 +639,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "admin.paymentSettingsError": "Error saving settings",
 
     // Admin - Inquiries
-    "admin.inquiries": "Inquiries",
-    "admin.guestInquiries": "Guest Inquiries",
+    "admin.inquiries": "Enquiries",
+    "admin.guestInquiries": "Guest Enquiries",
     "admin.backToList": "Back to list",
-    "admin.inquiryFrom": "Inquiry from",
+    "admin.inquiryFrom": "Enquiry from",
     "admin.propertyLabel": "Property:",
     "admin.statusLabel": "Status:",
     "admin.youHost": "You (Host)",
@@ -867,11 +867,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "inquiry.guests": "Guests",
     "inquiry.message": "Message",
     "inquiry.messagePlaceholder": "Tell us what you're looking for — longer stays, larger groups, special requests...",
-    "inquiry.send": "Send Inquiry",
+    "inquiry.send": "Send Enquiry",
     "inquiry.sending": "Sending...",
-    "inquiry.successTitle": "Inquiry Sent!",
+    "inquiry.successTitle": "Enquiry Sent!",
     "inquiry.successDesc": "We will reply to your email soon.",
-    "inquiry.errorGeneric": "Failed to send inquiry",
+    "inquiry.errorGeneric": "Failed to send enquiry",
     "inquiry.errorNetwork": "Network error. Please try again.",
 
     // Homepage inquiry CTA section
@@ -879,7 +879,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "home.inquiry.description": "For special rates, send us a message to receive a tailored offer.",
     "home.inquiry.benefit1": "Planning a longer stay? Contact us to find out about the special rates we offer for longer stays.",
     "home.inquiry.benefit2": "Special rates for longer stays. Send us a message to receive a tailored offer.",
-    "home.inquiry.cta": "Browse Properties & Inquire",
+    "home.inquiry.cta": "Browse Properties & Enquire",
     "home.inquiry.discountNote": "Savings for longer stays and groups",
 
     // Footer

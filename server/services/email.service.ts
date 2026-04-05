@@ -494,8 +494,8 @@ export async function sendInquiryNotificationEmail(
   const dashboardUrl = `${getFrontendUrl()}/admin/inquiries`;
 
   const html = `
-    <h1>New Inquiry Received</h1>
-    <p>A new inquiry has been submitted for <strong>${propertyName}</strong>.</p>
+    <h1>New Enquiry Received</h1>
+    <p>A new enquiry has been submitted for <strong>${propertyName}</strong>.</p>
     <h2>Guest Details</h2>
     <ul>
       <li><strong>Name:</strong> ${inquiry.guest_name}</li>
@@ -504,13 +504,13 @@ export async function sendInquiryNotificationEmail(
       <li><strong>Check-out:</strong> ${new Date(inquiry.checkout_date).toLocaleDateString()}</li>
       <li><strong>Guests:</strong> ${inquiry.guests}</li>
     </ul>
-    <a href="${dashboardUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Inquiries</a>
+    <a href="${dashboardUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Enquiries</a>
     <p>Best regards,<br/>LEONIDIONHOUSES</p>
   `;
 
   return sendEmail({
     to: adminEmail,
-    subject: `New inquiry from ${inquiry.guest_name} - ${propertyName}`,
+    subject: `New enquiry from ${inquiry.guest_name} - ${propertyName}`,
     html,
     type: "INQUIRY_NEW",
   });
@@ -529,19 +529,19 @@ export async function sendInquiryReplyEmail(
   const inquiryUrl = `${getFrontendUrl()}/inquiry/${inquiryId}?email=${encodeURIComponent(guestEmail)}`;
 
   const html = `
-    <h1>Reply to Your Inquiry</h1>
+    <h1>Reply to Your Enquiry</h1>
     <p>Dear ${guestName},</p>
-    <p>You have received a reply regarding your inquiry for <strong>${propertyName}</strong>.</p>
+    <p>You have received a reply regarding your enquiry for <strong>${propertyName}</strong>.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
       <p style="margin: 0;">${message.replace(/\n/g, "<br/>")}</p>
     </div>
-    <a href="${inquiryUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Inquiry</a>
+    <a href="${inquiryUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Enquiry</a>
     <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
   `;
 
   return sendEmail({
     to: guestEmail,
-    subject: `Reply to your inquiry - ${propertyName} [INQ#${inquiryId}]`,
+    subject: `Reply to your enquiry - ${propertyName} [INQ#${inquiryId}]`,
     html,
     type: "INQUIRY_REPLY",
   });

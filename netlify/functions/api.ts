@@ -1996,8 +1996,8 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${fromEmail}>`;
         const dashboardUrl = `${process.env.FRONTEND_URL || 'https://www.leonidionhouses.com'}/admin/inquiries`;
         const html = `
-          <h1>New Inquiry Received</h1>
-          <p>A new inquiry has been submitted for <strong>${propertyName}</strong>.</p>
+          <h1>New Enquiry Received</h1>
+          <p>A new enquiry has been submitted for <strong>${propertyName}</strong>.</p>
           <h2>Guest Details</h2>
           <ul>
             <li><strong>Name:</strong> ${guestName}</li>
@@ -2006,10 +2006,10 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
             <li><strong>Check-out:</strong> ${new Date(checkoutDate).toLocaleDateString()}</li>
             <li><strong>Guests:</strong> ${guests}</li>
           </ul>
-          <a href="${dashboardUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Inquiries</a>
+          <a href="${dashboardUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Enquiries</a>
           <p>Best regards,<br/>LEONIDIONHOUSES</p>
         `;
-        await resend.emails.send({ from, to: [adminEmail], replyTo: fromEmail, subject: `New inquiry from ${guestName} - ${propertyName}`, html }).catch((err: any) => console.error('[INQUIRY] Email failed:', err));
+        await resend.emails.send({ from, to: [adminEmail], replyTo: fromEmail, subject: `New enquiry from ${guestName} - ${propertyName}`, html }).catch((err: any) => console.error('[INQUIRY] Email failed:', err));
       }
       return {
         statusCode: 201,
@@ -2294,20 +2294,20 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
         const from = `${process.env.FROM_NAME || 'LEONIDIONHOUSES'} <${fromEmail}>`;
         const inquiryUrl = `${process.env.FRONTEND_URL || 'https://www.leonidionhouses.com'}/inquiry/${id}?email=${encodeURIComponent(inquiry.guest_email)}`;
         const html = `
-          <h1>Reply to Your Inquiry</h1>
+          <h1>Reply to Your Enquiry</h1>
           <p>Dear ${inquiry.guest_name},</p>
-          <p>You have received a reply regarding your inquiry for <strong>${propertyName}</strong>.</p>
+          <p>You have received a reply regarding your enquiry for <strong>${propertyName}</strong>.</p>
           <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <p style="margin: 0;">${String(message).replace(/\n/g, '<br/>')}</p>
           </div>
-          <a href="${inquiryUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Inquiry</a>
+          <a href="${inquiryUrl}" style="background-color: #0677A1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Enquiry</a>
           <p>Best regards,<br/>The LEONIDIONHOUSES Team</p>
         `;
         await resend.emails.send({
           from,
           to: [inquiry.guest_email],
           replyTo: fromEmail,
-          subject: `Reply to your inquiry - ${propertyName} [INQ#${id}]`,
+          subject: `Reply to your enquiry - ${propertyName} [INQ#${id}]`,
           html
         }).catch((err: any) => console.error('[INQUIRY] Reply email failed:', err));
       }

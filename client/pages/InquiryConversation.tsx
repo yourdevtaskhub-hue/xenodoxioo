@@ -48,7 +48,7 @@ export default function InquiryConversation() {
     try {
       const res = await fetch(apiUrl(`/api/inquiries/${id}?email=${encodeURIComponent(email)}`));
       if (!res.ok) {
-        setLoadError("Inquiry not found or unauthorized");
+        setLoadError("Enquiry not found or unauthorized");
         return;
       }
       const data = await res.json();
@@ -113,7 +113,7 @@ export default function InquiryConversation() {
     return (
       <Layout>
         <div className="container-max py-20 text-center">
-          <p className="text-destructive">{loadError || "Inquiry not found"}</p>
+          <p className="text-destructive">{loadError || "Enquiry not found"}</p>
         </div>
       </Layout>
     );
@@ -125,7 +125,7 @@ export default function InquiryConversation() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <MessageSquare size={28} className="text-primary" />
-            <h1 className="text-2xl font-bold">Inquiry Conversation</h1>
+            <h1 className="text-2xl font-bold">Enquiry Conversation</h1>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Property: <strong>{inquiry.property?.name}</strong></p>
@@ -158,7 +158,7 @@ export default function InquiryConversation() {
         {!guestEmailToUse && (
           <div className="mb-4 p-4 bg-muted/50 border border-border rounded-lg">
             <label className="block text-sm font-medium text-foreground mb-2">
-              Enter your email to reply (same email you used for this inquiry):
+              Enter your email to reply (same email you used for this enquiry):
             </label>
             <input
               type="email"
