@@ -1,6 +1,10 @@
 const { ImapFlow } = require("imapflow");
 const { simpleParser } = require("mailparser");
 const { createClient } = require("@supabase/supabase-js");
+const { Resend } = require("resend");
+
+const FORWARD_TO = ["ggmericas@yahoo.com", "leonidionhouses@yahoo.com"];
+const FORWARDED_FLAG = "$LHForwarded";
 
 exports.handler = async function () {
   const user = process.env.IMAP_USER;
@@ -16,6 +20,11 @@ exports.handler = async function () {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const fromEmail = process.env.FROM_EMAIL || "info@leonidionhouses.com";
+  const fromName = process.env.FROM_NAME || "LEONIDIONHOUSES";
+  const infoAddr = (process.env.IMAP_USER || "info@leonidionhouses.com").toLowerCase();
+
   const client = new ImapFlow({
     host: process.env.IMAP_HOST || "mail.privateemail.com",
     port: Number(process.env.IMAP_PORT) || 993,
@@ -24,7 +33,8 @@ exports.handler = async function () {
     logger: false,
   });
 
-  let processed = 0;
+  let forwarded = 0;
+  let inquiriesProcessed = 0;
 
   try {
     await client.connect();
@@ -45,26 +55,66 @@ exports.handler = async function () {
 
       for (const uid of uids) {
         try {
-          const raw = await client.fetchOne(uid, { source: true }, { uid: true });
+          const raw = await client.fetchOne(uid, { source: true, flags: true }, { uid: true });
           const parsed = await simpleParser(raw.source);
           const subject = parsed.subject || "";
+          const senderAddr = parsed.from?.value?.[0]?.address || "";
+          const senderName = parsed.from?.value?.[0]?.name || senderAddr;
 
-          const match = subject.match(/\[INQ#([^\]]+)\]/);
-          if (!match) {
+          if (senderAddr.toLowerCase() === infoAddr) {
             continue;
           }
 
-          const from = parsed.from?.value?.[0]?.address || "";
-          const infoAddr = (process.env.IMAP_USER || "info@leonidionhouses.com").toLowerCase();
-          if (from.toLowerCase() === infoAddr) {
+          const flags = raw.flags ? Array.from(raw.flags) : [];
+          const alreadyForwarded = flags.includes(FORWARDED_FLAG);
+
+          if (!alreadyForwarded) {
+            const htmlBody = parsed.html || parsed.textAsHtml || ("<pre>" + (parsed.text || "") + "</pre>");
+
+            const fwdHtml =
+              '<div style="font-family:sans-serif;color:#333">' +
+                '<p style="color:#666;font-size:13px">' +
+                  "<strong>From:</strong> " + senderName + " &lt;" + senderAddr + "&gt;<br/>" +
+                  "<strong>Subject:</strong> " + subject + "<br/>" +
+                  "<strong>Date:</strong> " + (parsed.date ? parsed.date.toISOString() : "N/A") +
+                "</p>" +
+                "<hr style='border:none;border-top:1px solid #ddd'/>" +
+                htmlBody +
+              "</div>";
+
+            for (const recipient of FORWARD_TO) {
+              try {
+                await resend.emails.send({
+                  from: fromName + " <" + fromEmail + ">",
+                  to: [recipient],
+                  replyTo: senderAddr,
+                  subject: "[FWD] " + subject,
+                  html: fwdHtml,
+                });
+              } catch (sendErr) {
+                console.error("[INBOUND] Failed to forward to " + recipient + ":", sendErr?.message);
+              }
+            }
+
+            try {
+              await client.messageFlagsAdd(uid, [FORWARDED_FLAG], { uid: true });
+            } catch (flagErr) {
+              console.warn("[INBOUND] Could not set forwarded flag:", flagErr?.message);
+            }
+
+            forwarded++;
+            console.log("[INBOUND] Forwarded email from " + senderAddr + ": " + subject);
+          }
+
+          const inqMatch = subject.match(/\[INQ#([^\]]+)\]/);
+          if (!inqMatch) {
             continue;
           }
 
-          const inquiryId = match[1];
+          const inquiryId = inqMatch[1];
           const replyText = extractReplyText(parsed.text || "");
 
           if (!replyText.trim()) {
-            console.log("[INBOUND] Empty reply for inquiry " + inquiryId + ", skipping");
             continue;
           }
 
@@ -109,8 +159,8 @@ exports.handler = async function () {
             })
             .eq("id", inquiryId);
 
-          processed++;
-          console.log("[INBOUND] Processed reply for inquiry " + inquiryId);
+          inquiriesProcessed++;
+          console.log("[INBOUND] Processed inquiry reply " + inquiryId);
         } catch (msgErr) {
           console.error("[INBOUND] Error processing UID " + uid + ":", msgErr?.message);
         }
@@ -124,8 +174,8 @@ exports.handler = async function () {
     console.error("[INBOUND] IMAP error:", err?.message);
   }
 
-  console.log("[INBOUND] Done — processed " + processed + " replies");
-  return { statusCode: 200, body: JSON.stringify({ processed }) };
+  console.log("[INBOUND] Done — forwarded " + forwarded + ", inquiry replies " + inquiriesProcessed);
+  return { statusCode: 200, body: JSON.stringify({ forwarded, inquiriesProcessed }) };
 };
 
 function extractReplyText(text) {
