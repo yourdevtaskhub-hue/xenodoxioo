@@ -5,7 +5,7 @@
   environment = { NODE_ENV = "production" }
 
 [functions]
-  external_node_modules = ["express", "serverless-http"]
+  external_node_modules = ["express", "serverless-http", "imapflow", "mailparser"]
   node_bundler = "esbuild"
   included_files = ["./Πίνακας Τιμών Δωματίων.txt"]
 
@@ -16,6 +16,10 @@
 # Balance due: charge deposit bookings (1st try ≈21 days before check-in, retry ≈19 days) — same cadence as Express node-cron
 [functions."charge-scheduled-payments"]
   schedule = "0 8 * * *"
+
+# Inbound email: poll IMAP for guest replies to inquiry emails every 5 minutes
+[functions."process-inbound-emails"]
+  schedule = "*/5 * * * *"
 
 # Payment routes → dedicated functions (must come before generic /api/*)
 [[redirects]]

@@ -2307,7 +2307,7 @@ async function handleInquiriesRoutes(path: string, method: string, supabase: any
           from,
           to: [inquiry.guest_email],
           replyTo: fromEmail,
-          subject: `Reply to your inquiry - ${propertyName}`,
+          subject: `Reply to your inquiry - ${propertyName} [INQ#${id}]`,
           html
         }).catch((err: any) => console.error('[INQUIRY] Reply email failed:', err));
       }

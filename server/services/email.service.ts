@@ -541,7 +541,7 @@ export async function sendInquiryReplyEmail(
 
   return sendEmail({
     to: guestEmail,
-    subject: `Reply to your inquiry - ${propertyName}`,
+    subject: `Reply to your inquiry - ${propertyName} [INQ#${inquiryId}]`,
     html,
     type: "INQUIRY_REPLY",
   });
