@@ -3,7 +3,7 @@ import { supabase } from "../lib/db";
 
 /** Map legacy FROM_EMAIL @leonidion-houses.com → verified @leonidionhouses.com (Resend). */
 function resolveFromEmail(): string {
-  const raw = (process.env.FROM_EMAIL || "noreply@leonidionhouses.com").trim();
+  const raw = (process.env.FROM_EMAIL || "info@leonidionhouses.com").trim();
   if (/@leonidion-houses\.com$/i.test(raw)) {
     return raw.replace(/@leonidion-houses\.com$/i, "@leonidionhouses.com");
   }
@@ -67,6 +67,7 @@ async function sendEmail(options: EmailOptions) {
       const { data, error } = await resend.emails.send({
         from,
         to: [to],
+        replyTo: FROM_EMAIL,
         subject,
         html,
       });

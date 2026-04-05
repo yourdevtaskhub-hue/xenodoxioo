@@ -237,7 +237,8 @@ async function processOfferPayment(
   }
   if (apiKey && fullBooking) {
     const resend = new Resend(apiKey);
-    const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`;
+    const fromEmail = process.env.FROM_EMAIL || "info@leonidionhouses.com";
+    const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${fromEmail}>`;
     const unit = (fullBooking as any).unit;
     const property = unit?.property;
     const viewUrl = `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || "")}`;
@@ -248,6 +249,7 @@ async function processOfferPayment(
     const receiptRes = await resend.emails.send({
       from,
       to: booking.guest_email,
+      replyTo: fromEmail,
       subject: "Payment Receipt - " + bookingNumber,
       html: `<h1>Payment Receipt</h1><p>Dear ${booking.guest_name},</p><p>Your payment of €${customTotal.toFixed(2)} has been processed. Booking ${bookingNumber} confirmed.</p><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p><p>Best regards,<br/>LEONIDIONHOUSES</p>`,
     });
@@ -257,6 +259,7 @@ async function processOfferPayment(
     const confirmRes = await resend.emails.send({
       from,
       to: booking.guest_email,
+      replyTo: fromEmail,
       subject: "Booking Confirmation",
       html: `<h1>Booking Confirmation</h1><p>Dear ${booking.guest_name},</p><p>Thank you for your booking.</p><ul><li><strong>Booking:</strong> ${bookingNumber}</li><li><strong>Room:</strong> ${property?.name || "N/A"}</li><li><strong>Arrival:</strong> ${checkInStr}</li><li><strong>Departure:</strong> ${checkOutStr}</li><li><strong>Total:</strong> €${customTotal.toFixed(2)}</li></ul><p><a href="${viewUrl}" style="background:#0677A1;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">View Booking</a></p>${cancelUrl ? `<p>Need to cancel? <a href="${cancelUrl}" style="color:#0677A1;">Cancel your booking</a></p>` : ""}<p>Best regards,<br/>LEONIDIONHOUSES</p>`,
     });
@@ -370,7 +373,8 @@ async function processSuccessfulPayment(
   const apiKey = process.env.RESEND_API_KEY;
   if (apiKey) {
     const resend = new Resend(apiKey);
-    const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "onboarding@resend.dev"}>`;
+    const fromEmail = process.env.FROM_EMAIL || "info@leonidionhouses.com";
+    const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${fromEmail}>`;
     const isGuest = !booking.user_id || booking.user_id === GUEST_USER_ID;
     const viewBookingUrl = isGuest
       ? `${frontendUrl}/booking/${booking.id}?email=${encodeURIComponent(booking.guest_email || "")}`
@@ -379,6 +383,7 @@ async function processSuccessfulPayment(
     await resend.emails.send({
       from,
       to: booking.guest_email,
+      replyTo: fromEmail,
       subject: `Payment Receipt - ${booking.booking_number}`,
       html: `
         <h1>Payment Receipt</h1>
@@ -408,6 +413,7 @@ async function processSuccessfulPayment(
       await resend.emails.send({
         from,
         to: booking.guest_email,
+        replyTo: fromEmail,
         subject: "Booking Confirmation",
         html: `
           <h1>Booking Confirmation</h1>

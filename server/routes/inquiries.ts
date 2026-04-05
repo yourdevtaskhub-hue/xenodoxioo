@@ -71,7 +71,7 @@ router.post("/", validate(createInquirySchema), async (req, res, next) => {
     await supabase.from("inquiries").update({ last_guest_message_at: new Date().toISOString() }).eq("id", inquiry.id);
 
     // Send email notification to admin
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@leonidionhouses.com";
+    const adminEmail = process.env.ADMIN_EMAIL || "info@leonidionhouses.com";
     const { data: property } = await supabase
       .from("properties")
       .select("name")

@@ -94,7 +94,8 @@ export const handler = async (event: any) => {
 
         if (fullBooking) {
           const resend = new Resend(apiKey);
-          const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${process.env.FROM_EMAIL || "noreply@leonidionhouses.com"}>`;
+          const fromEmail = process.env.FROM_EMAIL || "info@leonidionhouses.com";
+          const from = `${process.env.FROM_NAME || "LEONIDIONHOUSES"} <${fromEmail}>`;
           const frontendUrl = process.env.FRONTEND_URL || "https://www.leonidionhouses.com";
           const unit = fullBooking.unit as any;
           const property = unit?.property;
@@ -108,6 +109,7 @@ export const handler = async (event: any) => {
             await resend.emails.send({
               from,
               to: fullBooking.guest_email,
+              replyTo: fromEmail,
               subject: `Payment Receipt - ${fullBooking.booking_number}`,
               html: `
                 <h1>Payment Receipt</h1>
@@ -136,6 +138,7 @@ export const handler = async (event: any) => {
             await resend.emails.send({
               from,
               to: fullBooking.guest_email,
+              replyTo: fromEmail,
               subject: "Booking Confirmation",
               html: `
                 <h1>Booking Confirmation</h1>
