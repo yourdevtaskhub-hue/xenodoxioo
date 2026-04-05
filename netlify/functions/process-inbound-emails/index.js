@@ -31,16 +31,17 @@ exports.handler = async function () {
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      const uids = await client.search({ seen: false });
+      const since = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const uids = await client.search({ since: since });
 
       if (!uids.length) {
-        console.log("[INBOUND] No unread emails");
+        console.log("[INBOUND] No emails in last 2 hours");
         lock.release();
         await client.logout();
-        return { statusCode: 200, body: "No new emails" };
+        return { statusCode: 200, body: "No recent emails" };
       }
 
-      console.log("[INBOUND] Found " + uids.length + " unread email(s)");
+      console.log("[INBOUND] Found " + uids.length + " email(s) from last 2 hours");
 
       for (const uid of uids) {
         try {
@@ -49,14 +50,37 @@ exports.handler = async function () {
           const subject = parsed.subject || "";
 
           const match = subject.match(/\[INQ#([^\]]+)\]/);
-          if (!match) continue;
+          if (!match) {
+            continue;
+          }
+
+          const from = parsed.from?.value?.[0]?.address || "";
+          const infoAddr = (process.env.IMAP_USER || "info@leonidionhouses.com").toLowerCase();
+          if (from.toLowerCase() === infoAddr) {
+            continue;
+          }
 
           const inquiryId = match[1];
           const replyText = extractReplyText(parsed.text || "");
 
           if (!replyText.trim()) {
-            console.log("[INBOUND] Empty reply for inquiry " + inquiryId + ", marking read");
-            await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
+            console.log("[INBOUND] Empty reply for inquiry " + inquiryId + ", skipping");
+            continue;
+          }
+
+          const trimmedMessage = replyText.trim().slice(0, 10000);
+
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+          const { data: existing } = await supabase
+            .from("inquiry_messages")
+            .select("id")
+            .eq("inquiry_id", inquiryId)
+            .eq("sender_type", "guest")
+            .eq("message", trimmedMessage)
+            .gte("created_at", twoHoursAgo)
+            .limit(1);
+
+          if (existing && existing.length > 0) {
             continue;
           }
 
@@ -68,14 +92,13 @@ exports.handler = async function () {
 
           if (!inquiry) {
             console.warn("[INBOUND] Inquiry " + inquiryId + " not found, skipping");
-            await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
             continue;
           }
 
           await supabase.from("inquiry_messages").insert({
             inquiry_id: inquiryId,
             sender_type: "guest",
-            message: replyText.trim().slice(0, 10000),
+            message: trimmedMessage,
           });
 
           await supabase
@@ -86,7 +109,6 @@ exports.handler = async function () {
             })
             .eq("id", inquiryId);
 
-          await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
           processed++;
           console.log("[INBOUND] Processed reply for inquiry " + inquiryId);
         } catch (msgErr) {
